@@ -62,7 +62,7 @@ jobs:
       - name: Set the version
         run: |
           sed -i "s/^__version__ = .*/__version__ = \"${VERSION}\"/" src/opstend/__init__.py
-          (cd web && npm version --no-git-tag-version "${VERSION}" >/dev/null)
+          (cd web && npm version --no-git-tag-version --allow-same-version "${VERSION}" >/dev/null)
       - run: npm ci && npm run build
         working-directory: web
       - run: uv build --wheel && uv build --sdist

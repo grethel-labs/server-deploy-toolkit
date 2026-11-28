@@ -152,7 +152,7 @@ function WorkloadTable({ rows, empty, lang }: { rows: Workload[]; empty: string;
       <div className="table-wrap"><table>
         <thead><tr><th>{t("Application")}</th><th>{t("Runs on")}</th><th className="hide-sm">{t("Network")}</th><th className="hide-sm">{t("Checks")}</th><th>{t("State")}</th></tr></thead>
         <tbody>{rows.map((w) => (
-          <tr key={w.id} className="link" onClick={() => go(`/apps/${w.id}`)}>
+          <tr key={w.id} className="link" data-zorec={`app-${w.id}`} onClick={() => go(`/apps/${w.id}`)}>
             <td><b>{w.name}</b><span className="sub">{w.adapter ?? w.id}{w.expires_at ? ` · ${t("until {time}", { time: new Date(w.expires_at).toLocaleTimeString(lang, { hour: "2-digit", minute: "2-digit" }) })}` : ""}</span></td>
             <td>{w.host_name ?? "–"}</td>
             <td className="hide-sm small">{w.network.egress === "none" ? t("No internet") : w.network.egress === "internet" ? t("Internet") : t("{count} allowed hosts", { count: w.network.egress_hosts.length })}{w.connections.length ? ` · ${t("{count} paths", { count: w.connections.length })}` : ""}</td>
@@ -229,9 +229,9 @@ export function InstallWizard({ adapterId }: { adapterId: string }) {
       {step === 0 && (
         <Card title={t("Settings")}>
           <div className="grid cols-2">
-            <label className="lbl">{t("Name")}<input className="field" value={name} onChange={(e) => setName(e.target.value)} /></label>
+            <label className="lbl">{t("Name")}<input className="field" name="app-name" value={name} onChange={(e) => setName(e.target.value)} /></label>
             <label className="lbl">{t("Short name")}<span className="help">{t("Lowercase letters, digits and dashes; used for containers and networks.")}</span>
-              <input className="field" value={id} onChange={(e) => setId(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, "-"))} aria-invalid={!idOk} /></label>
+              <input className="field" name="app-id" value={id} onChange={(e) => setId(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, "-"))} aria-invalid={!idOk} /></label>
             {adapter.settings.map((s) => (
               <label key={s.name} className="lbl">{s.label}{s.required && " *"}
                 {s.help && <span className="help">{s.help}</span>}
@@ -239,11 +239,11 @@ export function InstallWizard({ adapterId }: { adapterId: string }) {
                   <><input className="field" type="password" autoComplete="new-password" value={secrets[s.name] ?? ""} onChange={(e) => setSecrets({ ...secrets, [s.name]: e.target.value })} />
                     <span className="help">{t("Stored encrypted; never shown again or written to jobs.")}</span></>
                 ) : s.type === "boolean" ? (
-                  <input type="checkbox" checked={Boolean(settings[s.name])} onChange={(e) => setSettings({ ...settings, [s.name]: e.target.checked })} />
+                  <input type="checkbox" name={`setting-${s.name}`} checked={Boolean(settings[s.name])} onChange={(e) => setSettings({ ...settings, [s.name]: e.target.checked })} />
                 ) : s.type === "select" ? (
-                  <select className="field" value={String(settings[s.name] ?? "")} onChange={(e) => setSettings({ ...settings, [s.name]: e.target.value })}>{s.options.map((o) => <option key={o}>{o}</option>)}</select>
+                  <select className="field" name={`setting-${s.name}`} value={String(settings[s.name] ?? "")} onChange={(e) => setSettings({ ...settings, [s.name]: e.target.value })}>{s.options.map((o) => <option key={o}>{o}</option>)}</select>
                 ) : (
-                  <input className="field" value={String(settings[s.name] ?? "")} onChange={(e) => setSettings({ ...settings, [s.name]: e.target.value })} />
+                  <input className="field" name={`setting-${s.name}`} value={String(settings[s.name] ?? "")} onChange={(e) => setSettings({ ...settings, [s.name]: e.target.value })} />
                 )}
               </label>
             ))}
@@ -254,9 +254,9 @@ export function InstallWizard({ adapterId }: { adapterId: string }) {
       {step === 1 && (
         <Card title={t("Resources and devices")} sub={t("Limits protect the other applications on the same host.")}>
           <div className="grid cols-3">
-            <label className="lbl">CPU<input className="field" type="number" min={0.1} step={0.25} value={resources.cpus} onChange={(e) => setResources({ ...resources, cpus: Number(e.target.value) })} /></label>
-            <label className="lbl">{t("Memory (MB)")}<input className="field" type="number" min={32} step={64} value={resources.memory_mb} onChange={(e) => setResources({ ...resources, memory_mb: Number(e.target.value) })} /></label>
-            <label className="lbl">{t("Storage (GB)")}<input className="field" type="number" min={1} value={resources.storage_gb} onChange={(e) => setResources({ ...resources, storage_gb: Number(e.target.value) })} /></label>
+            <label className="lbl">CPU<input className="field" name="cpus" type="number" min={0.1} step={0.25} value={resources.cpus} onChange={(e) => setResources({ ...resources, cpus: Number(e.target.value) })} /></label>
+            <label className="lbl">{t("Memory (MB)")}<input className="field" name="memory_mb" type="number" min={32} step={64} value={resources.memory_mb} onChange={(e) => setResources({ ...resources, memory_mb: Number(e.target.value) })} /></label>
+            <label className="lbl">{t("Storage (GB)")}<input className="field" name="storage_gb" type="number" min={1} value={resources.storage_gb} onChange={(e) => setResources({ ...resources, storage_gb: Number(e.target.value) })} /></label>
           </div>
           <h3 style={{ marginTop: 16 }}>{t("Devices")}</h3>
           <p className="muted small">{t("A device gives the application direct hardware access. Only add what it needs.")}</p>
@@ -520,7 +520,7 @@ export function FromRepository() {
       <Card>
         <form className="row" onSubmit={(e) => { e.preventDefault(); analyze(); }}>
           <label className="sr-only" htmlFor="repo">Repository</label>
-          <input id="repo" className="field" style={{ flex: 1, minWidth: 240 }} value={repo} onChange={(e) => setRepo(e.target.value)} placeholder="https://github.com/owner/repo" />
+          <input id="repo" name="repo" className="field" style={{ flex: 1, minWidth: 240 }} value={repo} onChange={(e) => setRepo(e.target.value)} placeholder="https://github.com/owner/repo" />
           <button className="btn primary" disabled={busy || !repo}>{busy ? t("Reading …") : t("Draft adapter")}</button>
           <button type="button" className="btn ghost" onClick={() => { const r = "https://github.com/werkstatt/wetterstation"; setRepo(r); analyze(r); }}>{t("Load example")}</button>
         </form>

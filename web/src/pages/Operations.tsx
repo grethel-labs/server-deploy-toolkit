@@ -40,8 +40,8 @@ export function Operations() {
       <div className="grid cols-2">
         <Card title={<span className="row"><Icon name="alert" />{t("Incidents")}</span>} action={<span className="pill plain">{incidents.length + data.unhealthy.length}</span>} flush>
           {incidents.length === 0 && data.unhealthy.length === 0 && <Empty>{t("No incidents. Everything runs.")}</Empty>}
-          {incidents.map((i) => (
-            <div key={i.id} className={`item sev-stripe ${i.severity}`}>
+          {incidents.map((i, n) => (
+            <div key={i.id} className={`item sev-stripe ${i.severity}`} data-zorec={`incident-${n}`}>
               <div className="row between">
                 <span className="title">{i.title}</span>
                 <Pill state={i.state} />
@@ -61,7 +61,7 @@ export function Operations() {
         <Card title={<span className="row"><Icon name="shield" />{t("Pending decisions")}</span>} action={<span className="pill plain">{data.decisions.length}</span>} flush>
           {data.decisions.length === 0 && <Empty>{t("Nothing is waiting for you.")}</Empty>}
           {data.decisions.map((j) => (
-            <div key={j.id} className="item">
+            <div key={j.id} className="item" data-zorec={`job-${j.id}`}>
               <div className="row between">
                 <span className="title">{j.title}</span>
                 <span className="pill warn">{j.requested_by === "zorec" ? t("Suggested by Zorec") : t("Your approval")}</span>
@@ -122,7 +122,7 @@ export function Operations() {
             action={<a href={href("/network")} className="small">{t("See all")}</a>} flush>
             {data.insights.length === 0 && <Empty>{t("Nothing unusual.")}</Empty>}
             {data.insights.map((i) => (
-              <div key={i.id} className={`item sev-stripe ${i.severity}`}>
+              <div key={i.id} className={`item sev-stripe ${i.severity}`} data-zorec={`insight-${i.id}`}>
                 <div className="row between"><span className="title">{i.title}</span><Pill state={i.severity} /></div>
                 <div className="muted small">{i.detail}</div>
                 {i.fix && canAct && (

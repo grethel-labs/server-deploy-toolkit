@@ -65,7 +65,7 @@ function NetOverview({ data }: { data: NetworkData }) {
         sub={t("Joins switch ports, VLANs, Proxmox bridges, guests and firewall – more than any single system sees.")} flush>
         {data.insights.length === 0 && <Empty>{t("Nothing unusual.")}</Empty>}
         {data.insights.map((i) => (
-          <div key={i.id} className={`item sev-stripe ${i.severity}`}>
+          <div key={i.id} className={`item sev-stripe ${i.severity}`} data-zorec={`insight-${i.id}`}>
             <div className="row between"><span className="title">{i.title}</span><Pill state={i.severity} /></div>
             <span className="muted small">{i.detail}</span>
             <div className="row">

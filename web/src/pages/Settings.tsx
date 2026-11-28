@@ -1,7 +1,9 @@
 import { useEffect, useState } from "react";
 import { api, type Session } from "../api";
+import { Icon } from "../components/Icon";
 import { Card, Loading } from "../components/ui";
-import { useCan, useData, useLang, useSession, useT, type Theme } from "../lib";
+import { go, useCan, useData, useLang, useRoute, useSession, useT, type Theme } from "../lib";
+import { AiSettings } from "./AiSettings";
 
 type Policy = {
   autonomy: Record<string, "observe" | "propose" | "auto">;
@@ -18,7 +20,9 @@ export function Settings({ theme, setTheme }: { theme: Theme; setTheme: (t: Them
   const lang = useLang();
   const { refresh } = useSession();
   const isAdmin = useCan("admin");
-  const { data } = useData<Policy>("/api/policy", []);
+  const route = useRoute();
+  const tab = route.params.get("tab") ?? "automation";
+  const { data, reload } = useData<Policy>("/api/policy", []);
   const [policy, setPolicy] = useState<Policy | null>(null);
   const [saved, setSaved] = useState<string | null>(null);
   useEffect(() => setPolicy(data), [data]);
@@ -34,7 +38,27 @@ export function Settings({ theme, setTheme }: { theme: Theme; setTheme: (t: Them
     ["deploy", "Create and change services"],
     ["backup", "Backups"],
     ["power", "Power actions"],
+    ["sandbox", "Remove expired sandboxes"],
   ];
+  const presets: { id: string; title: string; text: string; icon: string }[] = [
+    { id: "careful", title: t("Careful"), text: t("OpsTend prepares everything and waits for you. Only expired sandboxes are removed."), icon: "eye" },
+    { id: "balanced", title: t("Balanced"), text: t("Self-healing, security patches and backups run on their own. Everything else waits for you."), icon: "shield" },
+    { id: "full", title: t("Full automation"), text: t("Everything runs on its own within the maintenance window, budgets and the kill switch. Zorec may act on its own."), icon: "spark" },
+  ];
+  const presetOf = (p: Policy) =>
+    Object.values(p.autonomy).every((v) => v === "auto") ? "full"
+      : Object.entries(p.autonomy).every(([k, v]) => v === (k === "sandbox" ? "auto" : "propose")) ? "careful"
+        : p.autonomy.patch === "auto" && p.autonomy.upgrade === "propose" ? "balanced" : null;
+  async function applyPreset(id: string) {
+    try {
+      await api.post("/api/policy/preset", { preset: id });
+      reload();
+      setSaved(t("Saved"));
+    } catch (e) {
+      setSaved(String((e as Error).message));
+    }
+    window.setTimeout(() => setSaved(null), 2500);
+  }
   const dayNames = lang === "de" ? ["Mo", "Di", "Mi", "Do", "Fr", "Sa", "So"] : ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
   async function save(next: Policy) {
@@ -53,6 +77,22 @@ export function Settings({ theme, setTheme }: { theme: Theme; setTheme: (t: Them
       <div className="page-head">
         <div><h1>{t("Settings")}</h1></div>
         {saved && <span className="pill ok">{saved}</span>}
+      </div>
+      <div className="tabs" role="tablist">
+        {([["automation", t("Automation")], ["ai", t("Zorec & AI")], ["general", t("Appearance and language")]] as const).map(([id, label]) => (
+          <button key={id} role="tab" aria-selected={tab === id} onClick={() => go(`/settings?tab=${id}`)}>{label}</button>
+        ))}
+      </div>
+      {tab === "ai" && <AiSettings />}
+      {tab === "automation" && <>
+      <div className="preset-grid three" data-zorec="automation-presets">
+        {presets.map((p) => (
+          <button key={p.id} className={`preset${presetOf(policy) === p.id ? " selected" : ""}${p.id === "full" ? " bold" : ""}`} disabled={!isAdmin}
+            aria-pressed={presetOf(policy) === p.id} onClick={() => applyPreset(p.id)} data-zorec={`preset-${p.id}`}>
+            <span className="row"><Icon name={p.icon} /><b>{p.title}</b></span>
+            <span className="small">{p.text}</span>
+          </button>
+        ))}
       </div>
       <Card title={t("Automation kill switch")} sub={t("Pauses all automatic changes. Observation and insights continue.")}>
         <label className="chk"><input type="checkbox" disabled={!isAdmin} checked={policy.kill_switch} onChange={(e) => save({ ...policy, kill_switch: e.target.checked })} />
@@ -98,7 +138,8 @@ export function Settings({ theme, setTheme }: { theme: Theme; setTheme: (t: Them
           </div>
         </Card>
       </div>
-      <Card title={t("Appearance and language")}>
+      </>}
+      {tab === "general" && <Card title={t("Appearance and language")}>
         <div className="row">
           <div className="seg" role="group" aria-label={t("Theme")}>
             {(["system", "light", "dark"] as Theme[]).map((x) => <button key={x} aria-pressed={theme === x} onClick={() => setTheme(x)}>{{ system: "System", light: t("Light"), dark: t("Dark") }[x]}</button>)}
@@ -108,7 +149,7 @@ export function Settings({ theme, setTheme }: { theme: Theme; setTheme: (t: Them
           </div>
           <button className="btn ghost" onClick={() => api.del("/api/session").then(refresh)}>{t("Sign out")}</button>
         </div>
-      </Card>
+      </Card>}
     </>
   );
 }

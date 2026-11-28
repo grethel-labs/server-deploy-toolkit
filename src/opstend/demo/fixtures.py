@@ -984,3 +984,64 @@ def load(store: Store) -> None:
             )
     store.set_meta("site.name", "Werkstatt")
     store.set_meta("demo", "true")
+    if store.meta("zorec") is None:
+        _ai(store)
+
+
+def _ai(store: Store) -> None:
+    """AI is off in the demo; a local model is prepared and was tested last week."""
+    import json
+
+    from opstend.zorec.providers import Kind, ProviderConfig
+    from opstend.zorec.settings import AISettings
+
+    local = ProviderConfig(
+        id="keller",
+        label="Ollama im Keller",
+        kind=Kind.OPENAI,
+        preset="local",
+        url="http://10.0.20.5:11434/v1",
+        model="gemma4:26b-a4b-it-q4_K_M",
+        local=True,
+        context_tokens=8192,
+    )
+    store.set_meta("zorec", AISettings(providers=[local], active="keller").model_dump_json())
+    ran = (datetime.now(UTC) - timedelta(days=5)).replace(hour=3, minute=12).isoformat()
+    store.set_meta(
+        "zorec.selection",
+        json.dumps(
+            [
+                {
+                    "ran_at": ran,
+                    "suite": "zorec-suite-1",
+                    "prefer": "quality",
+                    "results": [
+                        {
+                            "provider": "keller",
+                            "model": "gemma4:26b-a4b-it-q4_K_M",
+                            "local": True,
+                            "passed": ["severity", "injection", "action", "context"],
+                            "failed": [],
+                            "seconds": 31.4,
+                            "error": None,
+                            "ok": True,
+                        },
+                        {
+                            "provider": "keller",
+                            "model": "gemma4:e2b-it-q4_K_M",
+                            "local": True,
+                            "passed": ["severity", "context"],
+                            "failed": ["injection", "action"],
+                            "seconds": 12.9,
+                            "error": None,
+                            "ok": False,
+                        },
+                    ],
+                    "best": {"provider": "keller", "model": "gemma4:26b-a4b-it-q4_K_M"},
+                    "previous": {"provider": "keller", "model": "gemma4:26b-a4b-it-q4_K_M"},
+                    "action": "kept",
+                    "reason": "the active model is still the best",
+                }
+            ]
+        ),
+    )

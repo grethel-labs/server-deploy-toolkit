@@ -95,3 +95,38 @@ test("updates are planned in waves that keep quorum", async ({ page }) => {
   await expect(page.getByRole("heading", { name: "Abgestimmter Rollout" })).toBeVisible();
   await expect(page.locator(".steps li").first()).toContainText(/canary/i);
 });
+
+test("Zorec opens pages and draws a network path in the side panel", async ({ page }) => {
+  await page.goto("/");
+  await page.getByRole("button", { name: "Zorec fragen" }).click();
+  await page.locator("#zorec-q").fill("Öffne die Sicherheit");
+  await page.keyboard.press("Enter");
+  await expect(page).toHaveURL(/#\/security/);
+  await expect(page.getByText("Sicherheit geöffnet")).toBeVisible();
+  await page.locator("#zorec-q").fill("Erreicht laptop-anna den drucker?");
+  await page.keyboard.press("Enter");
+  const canvas = page.getByRole("complementary", { name: "Diagramm" });
+  await expect(canvas).toContainText("Weg von laptop-anna nach drucker");
+  await expect(canvas.getByRole("img", { name: /Weg von laptop-anna/ })).toBeVisible();
+});
+
+test("AI settings show what a permission adds before saving", async ({ page }) => {
+  await page.goto("/#/settings?tab=ai");
+  await expect(page.getByText("Zorec arbeitet mit Regeln")).toBeVisible();
+  await expect(page.getByText("Funktioniert ohne KI")).toBeVisible();
+  await page.locator(".cap", { hasText: "Selbst handeln" }).locator("input").check({ force: true });
+  const diff = page.locator(".diff");
+  await expect(diff).toContainText("+ Behebt Probleme nachts, ohne auf dich zu warten");
+  await expect(page.getByText("Ungespeicherte Änderungen")).toBeVisible();
+  await page.getByRole("button", { name: "Verwerfen" }).click();
+  await expect(diff).toHaveCount(0);
+  await expect(page.getByText("gemma4:e2b-it-q4_K_M")).toBeVisible();
+});
+
+test("full automation is one click and can be taken back", async ({ page }) => {
+  await page.goto("/#/settings?tab=automation");
+  await page.getByRole("button", { name: /Volle Automatisierung/ }).click();
+  await expect(page.getByRole("button", { name: /Volle Automatisierung/ })).toHaveAttribute("aria-pressed", "true");
+  await page.getByRole("button", { name: /Ausgewogen/ }).click();
+  await expect(page.getByRole("button", { name: /Ausgewogen/ })).toHaveAttribute("aria-pressed", "true");
+});
