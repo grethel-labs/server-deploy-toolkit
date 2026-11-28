@@ -22,9 +22,13 @@ def server_templates() -> set[str]:
     found = set()
     for path in (ROOT / "src/opstend").rglob("*.py"):
         for node in ast.walk(ast.parse(path.read_text())):
-            if (isinstance(node, ast.Call) and isinstance(node.func, ast.Name)
-                    and node.func.id == "tr" and node.args
-                    and isinstance(node.args[0], ast.Constant)):
+            if (
+                isinstance(node, ast.Call)
+                and isinstance(node.func, ast.Name)
+                and node.func.id == "tr"
+                and node.args
+                and isinstance(node.args[0], ast.Constant)
+            ):
                 found.add(node.args[0].value)
     return found
 
@@ -57,8 +61,12 @@ def test_placeholders_match():
 
 
 def test_stored_texts_render_in_the_readers_language():
-    job = Job(title=tr("Restart {service}", service="Sensorik"), category="restart", target="x",
-              steps=[Step(action="a", effect=tr("Shut down {guest}", guest="fotos"))])
+    job = Job(
+        title=tr("Restart {service}", service="Sensorik"),
+        category="restart",
+        target="x",
+        steps=[Step(action="a", effect=tr("Shut down {guest}", guest="fotos"))],
+    )
     data = job.model_dump(mode="json")
     assert data["title"] == "Restart Sensorik"
     assert i18n.localize(data, "de")["title"] == "Sensorik neu starten"

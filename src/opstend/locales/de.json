@@ -370,6 +370,7 @@
  "Target host": "Ziel-Host",
  "Template": "Vorlage",
  "That did not work": "Das ging nicht",
+ "The cluster is electing a new leader. Try again in a few seconds.": "Der Cluster wählt gerade eine neue Steuerung. Versuche es in ein paar Sekunden noch einmal.",
  "The guest's NIC is tagged {vlan}{netname}. The switch port to {hname} carries native {port_native_vlan_or_1} and tagged {tagged}. The switch drops this guest's traffic.": "Die Netzwerkkarte des Gasts ist mit {vlan}{netname} markiert. Der Switch-Port zu {hname} führt nativ {port_native_vlan_or_1} und getaggt {tagged}. Der Switch verwirft den Verkehr dieses Gasts.",
  "The image runs as root inside the container; it stays unprivileged on the host through user namespaces.": "Das Image läuft im Container als root; auf dem Host bleibt es durch User-Namespaces ohne Rechte.",
  "The kill switch is on.": "Der Not-Aus ist aktiv.",

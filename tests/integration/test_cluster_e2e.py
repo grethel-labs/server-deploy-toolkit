@@ -178,7 +178,8 @@ def test_three_nodes_join_and_survive_leader_loss(tmp_path):
         )
         leader.login()
         policy["kill_switch"] = False
-        assert leader.client.put("/api/policy", json=policy).status_code == 200
+        # Right after an election the first write may wait for the new term to commit.
+        until(lambda: leader.client.put("/api/policy", json=policy).status_code == 200, 30)
     finally:
         for n in nodes:
             n.stop()

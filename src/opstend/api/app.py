@@ -20,6 +20,7 @@ from opstend import __version__, i18n
 from opstend.adapters.base import Capability
 from opstend.api.auth import RANK, Role, Session, Sessions, check_password, hash_password
 from opstend.cluster import rollout
+from opstend.cluster.consensus import NotLeader
 from opstend.cluster.node import web_routes
 from opstend.cluster.placement import ROLES
 from opstend.core.jobs import Job, JobError, JobState, Step
@@ -193,6 +194,14 @@ def build_app(rt: Runtime) -> FastAPI:
         redoc_url=None,
         openapi_url="/api/openapi.json",
     )
+
+    @app.exception_handler(NotLeader)
+    async def leadership_changing(_request: Request, _exc: NotLeader) -> JSONResponse:
+        return JSONResponse(
+            {"detail": tr("The cluster is electing a new leader. Try again in a few seconds.")},
+            status_code=503,
+            headers={"Retry-After": "3"},
+        )
 
     @app.middleware("http")
     async def security(

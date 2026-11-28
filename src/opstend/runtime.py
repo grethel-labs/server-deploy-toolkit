@@ -155,16 +155,21 @@ class Runtime:
         self.governor.policy = policy
         self._policy_raw = self.store.meta("policy")
 
-    async def write(self, command: dict[str, Any]) -> Any:
-        if self.raft.role != Role.LEADER and self.raft.leader_id is None:
-            # Before the first election finishes, wait briefly instead of failing.
-            for _ in range(40):
-                await asyncio.sleep(0.05)
-                if self.raft.role == Role.LEADER or self.raft.leader_id:
-                    break
-        if self.raft.role == Role.LEADER:
-            return await self.raft.propose(command)
-        return await self._forward("/cluster/propose", command)
+    async def write(self, command: dict[str, Any], patience: float = 10.0) -> Any:
+        """Replicate a command. During a leader change, wait and retry for up to `patience` s."""
+        loop = asyncio.get_running_loop()
+        deadline = loop.time() + patience
+        while True:
+            try:
+                if self.raft.role == Role.LEADER:
+                    return await self.raft.propose(command)
+                if self.raft.leader_id:
+                    return await self._forward("/cluster/propose", command)
+            except (NotLeader, TimeoutError, httpx.HTTPError):
+                pass
+            if loop.time() >= deadline:
+                raise NotLeader(self.raft.leader_id)
+            await asyncio.sleep(0.2)
 
     async def _forward(self, path: str, body: dict[str, Any]) -> Any:
         """Send a write or heartbeat to the current leader over mutual TLS."""
