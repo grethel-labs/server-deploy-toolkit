@@ -28,7 +28,7 @@ from typing import Any, Protocol
 from pydantic import Field
 
 from opstend.core.audit import AuditLog
-from opstend.core.models import Model, utcnow
+from opstend.core.models import Localized, utcnow
 from opstend.core.store import Store
 
 
@@ -63,7 +63,7 @@ class StepState(StrEnum):
     ROLLED_BACK = "rolled_back"
 
 
-class Step(Model):
+class Step(Localized):
     action: str
     params: dict[str, Any] = Field(default_factory=dict)
     title: str = ""
@@ -75,7 +75,7 @@ class Step(Model):
     finished_at: datetime | None = None
 
 
-class Job(Model):
+class Job(Localized):
     id: str = Field(default_factory=lambda: uuid.uuid4().hex[:12])
     title: str
     category: str
@@ -187,6 +187,9 @@ class Engine:
 
     async def _save(self, job: Job) -> None:
         job.updated_at = utcnow()
+        job.remember_texts("title", "reason", "message")
+        for step in job.steps:
+            step.remember_texts("title", "effect", "error")
         if self._writer is not None:
             # Replicated: the write returns once a majority stored it.
             await self._writer(

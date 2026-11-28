@@ -331,8 +331,8 @@ class Runtime:
             await asyncio.wait_for(asyncio.gather(*self._tasks, return_exceptions=True), 5)
 
     async def _loop(self, fn: Callable[[], Awaitable[None]], every: float) -> None:
-        # Background work writes texts in the node's language.
-        i18n.current.set(self.config.node.language)
+        # Background work renders texts in English; stored templates translate on read.
+        i18n.current.set(i18n.DEFAULT)
         while True:
             try:
                 if self.raft.role == Role.LEADER:

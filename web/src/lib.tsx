@@ -2,18 +2,39 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState, u
 import { api, onLive, type Session } from "./api";
 
 // --- language -------------------------------------------------------------------
+// One catalog per language lives on the server (src/opstend/locales/<lang>.json) and is
+// shared by the API and the web app. English is the source text and the fallback.
 
-export type Lang = "de" | "en";
-export const LangContext = createContext<Lang>("de");
+export type Lang = string;
+export type Catalog = Record<string, string>;
+export const LangContext = createContext<{ lang: Lang; catalog: Catalog }>({ lang: "en", catalog: {} });
 
-/** Translate inline: t("Betrieb", "Operations"). German first, it is the default. */
+export function format(template: string, params?: Record<string, unknown>) {
+  if (!params) return template;
+  return template.replace(/\{(\w+)\}/g, (m, key: string) => (key in params ? String(params[key]) : m));
+}
+
+/** t("Restart {service}", { service }) – English source text, translated from the catalog. */
 export function useT() {
-  const lang = useContext(LangContext);
-  return useCallback((de: string, en: string) => (lang === "de" ? de : en), [lang]);
+  const { catalog } = useContext(LangContext);
+  return useCallback(
+    (template: string, params?: Record<string, unknown>) => format(catalog[template] ?? template, params),
+    [catalog],
+  );
 }
 
 export function useLang() {
-  return useContext(LangContext);
+  return useContext(LangContext).lang;
+}
+
+export async function loadCatalog(lang: Lang): Promise<Catalog> {
+  if (lang === "en") return {};
+  try {
+    const res = await fetch(`/api/i18n/${encodeURIComponent(lang)}`);
+    return res.ok ? await res.json() : {};
+  } catch {
+    return {};
+  }
 }
 
 // --- session --------------------------------------------------------------------

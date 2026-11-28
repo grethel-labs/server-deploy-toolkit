@@ -20,8 +20,10 @@ from dataclasses import dataclass, field
 from enum import StrEnum
 from typing import Any
 
+from opstend import i18n
 from opstend.core.jobs import Engine, JobState
 from opstend.core.models import Severity
+from opstend.i18n import tr
 from opstend.network.graph import explain
 from opstend.state import Fleet
 from opstend.zorec.providers import Provider, ProviderError
@@ -74,8 +76,15 @@ EDIT_RULES = """- You may suggest changes. Put them after your answer in a fence
 Only use the listed actions. Leave the block out if no change is needed."""
 
 
-def _t(lang: str, de: str, en: str) -> str:
-    return de if lang == "de" else en
+LANGUAGE_NAMES = {
+    "en": "English",
+    "de": "German",
+    "fr": "French",
+    "es": "Spanish",
+    "it": "Italian",
+    "nl": "Dutch",
+    "pl": "Polish",
+}
 
 
 class Zorec:
@@ -167,17 +176,17 @@ class Zorec:
                 src, dst = hits[0], hits[1]
                 path = explain(f.graph, src[1], dst[1])
                 steps = "\n".join(f"• {s}" for s in path.steps)
-                verdict = _t(
-                    lang,
-                    "erreicht" if path.reachable else "erreicht nicht",
-                    "reaches" if path.reachable else "does not reach",
+                verdict = (
+                    tr("{source} reaches {target}.", source=src[2], target=dst[2])
+                    if path.reachable
+                    else tr("{source} does not reach {target}.", source=src[2], target=dst[2])
                 )
                 return Answer(
-                    text=f"{src[2]} {verdict} {dst[2]}.\n{steps}",
+                    text=f"{verdict}\n{steps}",
                     source="rules",
                     links=[
                         Link(
-                            _t(lang, "In der Topologie zeigen", "Show in topology"),
+                            tr("Show in topology"),
                             f"#/network/topology?focus={dst[1]}",
                         )
                     ],
@@ -190,63 +199,41 @@ class Zorec:
             lines = []
             if bad_hosts:
                 lines.append(
-                    _t(
-                        lang,
-                        f"Auffällige Systeme: {', '.join(bad_hosts)}.",
-                        f"Systems needing attention: {', '.join(bad_hosts)}.",
+                    tr(
+                        "Systems needing attention: {join_bad_hosts}.",
+                        join_bad_hosts=", ".join(bad_hosts),
                     )
                 )
             if waiting:
                 lines.append(
-                    _t(
-                        lang,
-                        f"{len(waiting)} Entscheidung(en) warten auf dich: ",
-                        f"{len(waiting)} decision(s) wait for you: ",
-                    )
+                    tr("{len_waiting} decision(s) wait for you: ", len_waiting=len(waiting))
                     + "; ".join(j.title for j in waiting[:4])
                     + "."
                 )
             running = [j for j in jobs if j.state in (JobState.RUNNING, JobState.SCHEDULED)]
             if running:
                 lines.append(
-                    _t(lang, "Ich kümmere mich gerade um: ", "I am working on: ")
-                    + "; ".join(j.title for j in running[:4])
-                    + "."
+                    tr("I am working on: ") + "; ".join(j.title for j in running[:4]) + "."
                 )
             if crit:
-                lines.append(
-                    _t(lang, "Wichtigster Netzwerkhinweis: ", "Top network insight: ")
-                    + crit[0].title
-                    + "."
-                )
+                lines.append(tr("Top network insight: ") + crit[0].title + ".")
             if not lines:
-                lines.append(
-                    _t(
-                        lang,
-                        "Alles ruhig. Keine offenen Störungen oder Entscheidungen.",
-                        "All quiet. No open incidents or decisions.",
-                    )
-                )
-            return Answer(
-                " ".join(lines), "rules", [Link(_t(lang, "Zum Betrieb", "Open operations"), "#/")]
-            )
+                lines.append(tr("All quiet. No open incidents or decisions."))
+            return Answer(" ".join(lines), "rules", [Link(tr("Open operations"), "#/")])
         if re.search(r"(update|aktualis|patch|firmware)", ql):
             ups = f.updates()
             sec = [u for u in ups if u.security]
             fw = [d for d in f.devices() if d.upgrade_to]
-            text = _t(
-                lang,
-                f"{len(ups)} Updates verfügbar, davon {len(sec)} sicherheitsrelevant. "
-                f"{len(fw)} Netzwerkgeräte haben neue Firmware. Sicherheitsupdates spiele ich im "
-                "nächsten Wartungsfenster ein; alles andere bündle ich in einen abgestimmten Rollout.",
-                f"{len(ups)} updates available, {len(sec)} of them security updates. "
-                f"{len(fw)} network devices have new firmware. Security updates install in the next "
-                "maintenance window; everything else goes into one coordinated rollout.",
+            text = tr(
+                "{len_ups} updates available, {len_sec} of them security updates. {len_fw} network devices have new firmware. Security updates install in the next maintenance window; everything else goes into one coordinated rollout.",
+                len_ups=len(ups),
+                len_sec=len(sec),
+                len_fw=len(fw),
             )
             actions = (
                 [
                     ProposedAction(
-                        _t(lang, "Abgestimmten Rollout planen", "Plan coordinated rollout"),
+                        tr("Plan coordinated rollout"),
                         "rollout.plan",
                         {},
                     )
@@ -259,29 +246,25 @@ class Zorec:
             items = sorted(f.findings(), key=lambda x: SEV_ORDER[Severity(x.severity)])[:5]
             if not items:
                 return Answer(
-                    _t(lang, "Keine offenen Sicherheitsbefunde.", "No open security findings."),
+                    tr("No open security findings."),
                     "rules",
-                    [Link(_t(lang, "Sicherheit", "Security"), "#/security")],
+                    [Link(tr("Security"), "#/security")],
                 )
             lines = [
                 f"• {x.title} ({x.severity}{', KEV' if x.kev else ''}"
-                f"{_t(lang, ', öffentlich erreichbar', ', public') if x.exposed else ''})"
+                f"{tr(', public') if x.exposed else ''})"
                 for x in items
             ]
             return Answer(
-                _t(lang, "Die wichtigsten Befunde:\n", "Top findings:\n") + "\n".join(lines),
+                tr("Top findings:\n") + "\n".join(lines),
                 "rules",
-                [Link(_t(lang, "Sicherheit", "Security"), "#/security")],
+                [Link(tr("Security"), "#/security")],
             )
         if re.search(r"(netz|network|vlan|wlan|wifi|switch|port|kabel)", ql):
             ins = f.insights[:5]
             if not ins:
                 return Answer(
-                    _t(
-                        lang,
-                        "Im Netzwerk ist mir nichts aufgefallen.",
-                        "Nothing stands out in the network.",
-                    ),
+                    tr("Nothing stands out in the network."),
                     "rules",
                 )
             actions = [
@@ -296,7 +279,7 @@ class Zorec:
             return Answer(
                 "\n".join(f"• {i.title}" for i in ins),
                 "rules",
-                [Link(_t(lang, "Netzwerk", "Network"), "#/network")],
+                [Link(tr("Network"), "#/network")],
                 actions,
             )
         m = re.search(r"(wo läuft|wo laeuft|where (does|is)) (.+?)\??$", ql)
@@ -308,23 +291,19 @@ class Zorec:
                 host = next((h for h in f.hosts() if guest and h.id == guest.host_id), None)
                 where = f"{host.name} ({host.site})" if host else oid
                 return Answer(
-                    _t(lang, f"{name} läuft auf {where}.", f"{name} runs on {where}."),
+                    tr("{name} runs on {where}.", name=name, where=where),
                     "rules",
                     [Link(name, f"#/object/{oid}")],
                 )
         url = re.search(r"https?://\S+\.git|https?://(github|gitlab|codeberg)\.\S+", q)
         if url or re.search(r"(deploy|neuer dienst|installier|einrichten)", ql):
-            text = _t(
-                lang,
-                "Gib mir die Repository-URL. Ich lese Compose- oder Containerfile, "
-                "schlage eine Konfiguration vor und zeige dir vor dem Start, was passiert.",
-                "Give me the repository URL. I read the Compose file or Containerfile, propose a "
-                "configuration and show you what will happen before anything starts.",
+            text = tr(
+                "Give me the repository URL. I read the Compose file or Containerfile, propose a configuration and show you what will happen before anything starts."
             )
             actions = (
                 [
                     ProposedAction(
-                        _t(lang, "Repository analysieren", "Analyze repository"),
+                        tr("Analyze repository"),
                         "deploy.analyze",
                         {"repo": url.group(0)},
                     )
@@ -335,7 +314,7 @@ class Zorec:
             return Answer(
                 text,
                 "rules",
-                [Link(_t(lang, "Neuer Dienst", "New service"), "#/services/new")],
+                [Link(tr("New service"), "#/services/new")],
                 actions,
             )
         return None
@@ -368,26 +347,23 @@ class Zorec:
         *,
         page: dict[str, Any] | None = None,
         mode: Mode = Mode.READ,
-        lang: str = "de",
+        lang: str | None = None,
         history: list[dict[str, str]] | None = None,
     ) -> Answer:
         question = question.strip()[:2000]
+        lang = lang or i18n.current.get()
         ruled = self._rules(question, lang, mode)
         if ruled and (self.provider is None or ruled.actions or not history):
             return ruled
         if self.provider is None:
             return ruled or Answer(
-                _t(
-                    lang,
-                    "Dazu habe ich ohne Sprachmodell keine Antwort. Frag mich nach Störungen, Updates, "
-                    "Sicherheit, dem Netzwerk, wo etwas läuft oder wie zwei Systeme sich erreichen.",
-                    "I cannot answer that without a language model. Ask me about incidents, updates, "
-                    "security, the network, where something runs or how two systems reach each other.",
+                tr(
+                    "I cannot answer that without a language model. Ask me about incidents, updates, security, the network, where something runs or how two systems reach each other."
                 ),
                 "rules",
             )
         system = SYSTEM.format(
-            language="German" if lang == "de" else "English",
+            language=LANGUAGE_NAMES.get(lang, "English"),
             edit_rules=EDIT_RULES.format(actions=", ".join(self.allowed_actions))
             if mode == Mode.EDIT
             else "- Read-only mode: do not suggest changes.",
@@ -405,20 +381,12 @@ class Zorec:
             if ruled:
                 return ruled
             return Answer(
-                _t(
-                    lang,
-                    f"Das Sprachmodell ist gerade nicht erreichbar ({exc}).",
-                    f"The language model is not available right now ({exc}).",
-                ),
+                tr("The language model is not available right now ({exc}).", exc=exc),
                 "rules",
             )
         if reply.refused:
             return Answer(
-                _t(
-                    lang,
-                    "Diese Frage kann ich nicht beantworten.",
-                    "I can't help with that question.",
-                ),
+                tr("I can't help with that question."),
                 "model",
                 model=reply.model,
             )

@@ -17,7 +17,7 @@ from opstend.core.jobs import ActionRegistry, Context, FunctionAction
 from opstend.core.models import Guest, GuestKind, GuestState, Health
 from opstend.core.policy import Category
 from opstend.core.store import Store
-from opstend.i18n import t
+from opstend.i18n import tr
 
 
 class Backend(Protocol):
@@ -31,13 +31,13 @@ def _name(store: Store, kind: str, oid: str | None) -> str:
     return str(doc.get("name", oid)) if doc else str(oid)
 
 
-POWER_DE = {
-    "start": "starten",
-    "stop": "hart ausschalten",
-    "shutdown": "herunterfahren",
-    "reboot": "neu starten",
-    "suspend": "pausieren",
-    "resume": "fortsetzen",
+POWER: dict[str, Callable[[str], str]] = {
+    "start": lambda g: tr("Start {guest}", guest=g),
+    "stop": lambda g: tr("Force off {guest}", guest=g),
+    "shutdown": lambda g: tr("Shut down {guest}", guest=g),
+    "reboot": lambda g: tr("Reboot {guest}", guest=g),
+    "suspend": lambda g: tr("Pause {guest}", guest=g),
+    "resume": lambda g: tr("Resume {guest}", guest=g),
 }
 
 
@@ -52,144 +52,132 @@ def descriptions(store: Store) -> dict[str, tuple[str, Callable[[dict[str, Any]]
     return {
         "guest.power": (
             Category.POWER,
-            lambda p: t(
-                f"{p['action'].capitalize()} {g(p)}",
-                f"{g(p)} {POWER_DE.get(p['action'], p['action'])}",
-            ),
+            lambda p: POWER[p["action"]](g(p)),
         ),
         "guest.snapshot": (
             Category.BACKUP,
-            lambda p: t(
-                f"Create snapshot '{p['name']}' of {g(p)}",
-                f"Snapshot „{p['name']}“ von {g(p)} anlegen",
-            ),
+            lambda p: tr("Create snapshot '{p_name}' of {g_p}", p_name=p["name"], g_p=g(p)),
         ),
         "guest.snapshot_rollback": (
             Category.POWER,
-            lambda p: t(
-                f"Roll {g(p)} back to snapshot '{p['name']}'",
-                f"{g(p)} auf Snapshot „{p['name']}“ zurücksetzen",
-            ),
+            lambda p: tr("Roll {g_p} back to snapshot '{p_name}'", g_p=g(p), p_name=p["name"]),
         ),
         "guest.snapshot_delete": (
             Category.BACKUP,
-            lambda p: t(
-                f"Delete snapshot '{p['name']}' of {g(p)}",
-                f"Snapshot „{p['name']}“ von {g(p)} löschen",
-            ),
+            lambda p: tr("Delete snapshot '{p_name}' of {g_p}", p_name=p["name"], g_p=g(p)),
         ),
         "guest.backup": (
             Category.BACKUP,
-            lambda p: t(
-                f"Back up {g(p)} to {p.get('destination', 'default target')}",
-                f"{g(p)} nach {p.get('destination', 'Standardziel')} sichern",
+            lambda p: tr(
+                "Back up {guest} to {destination}",
+                guest=g(p),
+                destination=p.get("destination") or tr("the default target"),
             ),
         ),
         "guest.clone": (
             Category.DEPLOY,
-            lambda p: t(
-                f"Create {p['name']} from template {g({'guest': p['template']})}",
-                f"{p['name']} aus Vorlage {g({'guest': p['template']})} anlegen",
+            lambda p: tr(
+                "Create {p_name} from template {g_guest_p_template}",
+                p_name=p["name"],
+                g_guest_p_template=g({"guest": p["template"]}),
             ),
         ),
         "guest.migrate": (
             Category.RESCHEDULE,
-            lambda p: t(f"Move {g(p)} to {h(p)}", f"{g(p)} nach {h(p)} verschieben"),
+            lambda p: tr("Move {g_p} to {h_p}", g_p=g(p), h_p=h(p)),
         ),
         "service.restart": (
             Category.RESTART,
-            lambda p: t(
-                f"Restart {s(p)} and check its health", f"{s(p)} neu starten und Gesundheit prüfen"
-            ),
+            lambda p: tr("Restart {s_p} and check its health", s_p=s(p)),
         ),
         "host.patch": (
             Category.PATCH,
-            lambda p: t(
-                f"Install {'security ' if p.get('security_only') else ''}updates on {h(p)}",
-                f"{'Sicherheits-' if p.get('security_only') else ''}Updates auf {h(p)} installieren",
+            lambda p: (
+                tr("Install security updates on {host}", host=h(p))
+                if p.get("security_only")
+                else tr("Install updates on {host}", host=h(p))
             ),
         ),
-        "host.reboot": (Category.POWER, lambda p: t(f"Reboot {h(p)}", f"{h(p)} neu starten")),
+        "host.reboot": (Category.POWER, lambda p: tr("Reboot {h_p}", h_p=h(p))),
         "host.bridge_vlan_aware": (
             Category.NETWORK,
-            lambda p: t(
-                f"Make bridge {p['bridge']} VLAN-aware", f"Bridge {p['bridge']} VLAN-fähig machen"
-            ),
+            lambda p: tr("Make bridge {bridge} VLAN-aware", bridge=p["bridge"]),
         ),
         "unifi.port_vlans": (
             Category.NETWORK,
-            lambda p: t(
-                f"Allow VLAN {p['add_vlan']} on {d(p)} port {p['port']}",
-                f"VLAN {p['add_vlan']} an {d(p)} Port {p['port']} erlauben",
+            lambda p: tr(
+                "Allow VLAN {add_vlan} on {d_p} port {p_port}",
+                add_vlan=p["add_vlan"],
+                d_p=d(p),
+                p_port=p["port"],
             ),
         ),
         "unifi.port_profile": (
             Category.NETWORK,
-            lambda p: t(
-                f"Assign profile {p['profile']} to {d(p)} port {p['port']}",
-                f"Profil {p['profile']} an {d(p)} Port {p['port']} setzen",
+            lambda p: tr(
+                "Assign profile {profile} to {d_p} port {p_port}",
+                profile=p["profile"],
+                d_p=d(p),
+                p_port=p["port"],
             ),
         ),
         "unifi.device_restart": (
             Category.POWER,
-            lambda p: t(f"Restart {d(p)}", f"{d(p)} neu starten"),
+            lambda p: tr("Restart {d_p}", d_p=d(p)),
         ),
         "unifi.device_upgrade": (
             Category.UPGRADE,
-            lambda p: t(f"Install firmware on {d(p)}", f"Firmware auf {d(p)} installieren"),
+            lambda p: tr("Install firmware on {d_p}", d_p=d(p)),
         ),
         "unifi.poe_cycle": (
             Category.POWER,
-            lambda p: t(
-                f"Power-cycle PoE on {d(p)} port {p['port']}",
-                f"PoE an {d(p)} Port {p['port']} aus- und einschalten",
-            ),
+            lambda p: tr("Power-cycle PoE on {d_p} port {p_port}", d_p=d(p), p_port=p["port"]),
         ),
         "unifi.client_block": (
             Category.NETWORK,
-            lambda p: t(
-                f"{'Block' if p.get('block', True) else 'Unblock'} client {p['mac']}",
-                f"Client {p['mac']} {'sperren' if p.get('block', True) else 'freigeben'}",
+            lambda p: (
+                tr("Block client {mac}", mac=p["mac"])
+                if p.get("block", True)
+                else tr("Unblock client {mac}", mac=p["mac"])
             ),
         ),
         "unifi.firewall_block": (
             Category.NETWORK,
-            lambda p: t(
-                f"Block traffic {_name(store, 'network', p['src'])} → {_name(store, 'network', p['dst'])}",
-                f"Verkehr {_name(store, 'network', p['src'])} → {_name(store, 'network', p['dst'])} sperren",
+            lambda p: tr(
+                "Block traffic {name_store_network_p_src} → {name_store_network_p_dst}",
+                name_store_network_p_src=_name(store, "network", p["src"]),
+                name_store_network_p_dst=_name(store, "network", p["dst"]),
             ),
         ),
         "publication.withdraw": (
             Category.QUARANTINE,
-            lambda p: t(
-                f"Withdraw public access ({_name(store, 'publication', p['publication'])})",
-                f"Öffentlichen Zugang zurückziehen ({(store.get('publication', p['publication']) or {}).get('hostname')})",
+            lambda p: tr(
+                "Withdraw public access ({hostname})",
+                hostname=(store.get("publication", p["publication"]) or {}).get("hostname"),
             ),
         ),
         "backup.run": (
             Category.BACKUP,
-            lambda p: t(f"Back up {p['target']}", f"{p['target']} sichern"),
+            lambda p: tr("Back up {target}", target=p["target"]),
         ),
         "cluster.replace_node": (
             Category.RESCHEDULE,
-            lambda p: t(
-                f"Move OpsTend roles off {_name(store, 'node', p['node'])}",
-                f"OpsTend-Rollen von {_name(store, 'node', p['node'])} verlagern",
+            lambda p: tr(
+                "Move OpsTend roles off {name_store_node_p_node}",
+                name_store_node_p_node=_name(store, "node", p["node"]),
             ),
         ),
         "opstend.self_update": (
             Category.UPGRADE,
-            lambda p: t(
-                f"Update OpsTend on {_name(store, 'node', p['node'])} to {p['version']}",
-                f"OpsTend auf {_name(store, 'node', p['node'])} auf {p['version']} aktualisieren",
+            lambda p: tr(
+                "Update OpsTend on {name_store_node_p_node} to {version}",
+                name_store_node_p_node=_name(store, "node", p["node"]),
+                version=p["version"],
             ),
         ),
         "deploy.apply": (
             Category.DEPLOY,
-            lambda p: t(
-                f"Deploy {p['spec']['name']} on {h(p)}",
-                f"{p['spec']['name']} auf {h(p)} bereitstellen",
-            ),
+            lambda p: tr("Deploy {spec_name} on {h_p}", spec_name=p["spec"]["name"], h_p=h(p)),
         ),
     }
 
@@ -496,12 +484,7 @@ class LiveBackend:
         if action == "service.restart":
             svc = self.store.get("service", p["service"]) or {}
             if not svc.get("guest_id"):
-                raise RuntimeError(
-                    t(
-                        "The service has no guest to restart",
-                        "Der Dienst hat keinen Gast zum Neustarten",
-                    )
-                )
+                raise RuntimeError(tr("The service has no guest to restart"))
             guest, adapter = self._guest(svc["guest_id"])
             await adapter.power(guest, GuestAction.REBOOT)
             return {}
@@ -530,18 +513,13 @@ class LiveBackend:
                 return {"device_id": raw["_id"], "previous": prev}
             else:
                 raise RuntimeError(
-                    t(
-                        f"{action} needs a port profile; choose one in the network view",
-                        f"{action} braucht ein Portprofil; wähle es in der Netzwerkansicht",
+                    tr(
+                        "{action} needs a port profile; choose one in the network view",
+                        action=action,
                     )
                 )
             return {}
-        raise RuntimeError(
-            t(
-                f"{action} is not available on live systems yet",
-                f"{action} ist für echte Systeme noch nicht verfügbar",
-            )
-        )
+        raise RuntimeError(tr("{action} is not available on live systems yet", action=action))
 
     async def verify(self, action: str, p: dict[str, Any], result: dict[str, Any]) -> bool:
         if action == "guest.power":

@@ -4,7 +4,6 @@ node:
   address: 10.20.10.11          # address other nodes use to reach this one
   site: Werkstatt
   labels: {storage: "yes"}      # gpu, storage, zone=… guide role placement
-  language: de                  # language of texts written by the automation
 
 listen:
   web: 0.0.0.0:8443

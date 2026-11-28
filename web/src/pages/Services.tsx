@@ -13,12 +13,12 @@ export function Services() {
   const core = data.filter((s) => s.core);
   const table = (rows: Service[]) => (
     <div className="table-wrap"><table>
-      <thead><tr><th>{t("Dienst", "Service")}</th><th>{t("Läuft auf", "Runs on")}</th><th className="hide-sm">{t("Erreichbar unter", "Reachable at")}</th><th>{t("Zustand", "State")}</th></tr></thead>
+      <thead><tr><th>{t("Service")}</th><th>{t("Runs on")}</th><th className="hide-sm">{t("Reachable at")}</th><th>{t("State")}</th></tr></thead>
       <tbody>{rows.map((s) => (
         <tr key={s.id} className={s.guest_id ? "link" : ""} onClick={() => s.guest_id && go(`/guests/${encodeURIComponent(s.guest_id)}`)}>
           <td><b>{s.name}</b><span className="sub">{s.description}{s.version ? ` · ${s.version}` : ""}</span></td>
           <td>{s.guest?.name ?? "–"}<span className="sub">{s.host_name ?? ""}</span></td>
-          <td className="hide-sm mono small">{s.endpoints[0] ?? "–"}{s.exposed && <span className="pill warn plain" style={{ marginLeft: 6 }}>{t("öffentlich", "public")}</span>}</td>
+          <td className="hide-sm mono small">{s.endpoints[0] ?? "–"}{s.exposed && <span className="pill warn plain" style={{ marginLeft: 6 }}>{t("public")}</span>}</td>
           <td><HealthPill health={s.health} /></td>
         </tr>
       ))}</tbody>
@@ -27,11 +27,11 @@ export function Services() {
   return (
     <>
       <div className="page-head">
-        <div><h1>{t("Dienste", "Services")}</h1><p className="muted">{t("Anwendungen und die Dienste, die OpsTend selbst betreibt.", "Applications and the services OpsTend runs itself.")}</p></div>
-        {canAct && <a className="btn primary" href={href("/services/new")}><Icon name="plus" />{t("Neuer Dienst", "New service")}</a>}
+        <div><h1>{t("Services")}</h1><p className="muted">{t("Applications and the services OpsTend runs itself.")}</p></div>
+        {canAct && <a className="btn primary" href={href("/services/new")}><Icon name="plus" />{t("New service")}</a>}
       </div>
-      <Card title={t("Anwendungen", "Applications")} flush>{apps.length ? table(apps) : <Empty>–</Empty>}</Card>
-      <Card title={t("Basisdienste", "Core services")} sub={t("Steuerung, Zeit, DNS, Proxy und Zorec", "Control plane, time, DNS, proxy and Zorec")} flush>{table(core)}</Card>
+      <Card title={t("Applications")} flush>{apps.length ? table(apps) : <Empty>–</Empty>}</Card>
+      <Card title={t("Core services")} sub={t("Control plane, time, DNS, proxy and Zorec")} flush>{table(core)}</Card>
     </>
   );
 }
@@ -78,24 +78,24 @@ export function NewService() {
     <>
       <div className="page-head">
         <div>
-          <div className="eyebrow"><a href={href("/services")}>{t("Dienste", "Services")}</a></div>
-          <h1>{t("Neuer Dienst aus einem Repository", "New service from a repository")}</h1>
-          <p className="muted">{t("Zorec liest Compose-Datei oder Containerfile, schlägt eine sichere Konfiguration vor und zeigt dir vor dem Start, was passiert.", "Zorec reads the Compose file or Containerfile, proposes a safe configuration and shows what will happen before anything starts.")}</p>
+          <div className="eyebrow"><a href={href("/services")}>{t("Services")}</a></div>
+          <h1>{t("New service from a repository")}</h1>
+          <p className="muted">{t("Zorec reads the Compose file or Containerfile, proposes a safe configuration and shows what will happen before anything starts.")}</p>
         </div>
       </div>
       <Card>
         <form className="row" onSubmit={(e) => { e.preventDefault(); analyze(); }}>
           <label className="sr-only" htmlFor="repo">Repository</label>
           <input id="repo" className="field" style={{ flex: 1, minWidth: 240 }} value={repo} onChange={(e) => setRepo(e.target.value)} placeholder="https://github.com/owner/repo" />
-          <button className="btn primary" disabled={busy || !repo}>{busy ? t("Liest …", "Reading …") : t("Analysieren", "Analyze")}</button>
-          <button type="button" className="btn ghost" onClick={() => { setRepo("https://github.com/werkstatt/wetterstation"); analyze("https://github.com/werkstatt/wetterstation"); }}>{t("Beispiel laden", "Load example")}</button>
+          <button className="btn primary" disabled={busy || !repo}>{busy ? t("Reading …") : t("Analyze")}</button>
+          <button type="button" className="btn ghost" onClick={() => { setRepo("https://github.com/werkstatt/wetterstation"); analyze("https://github.com/werkstatt/wetterstation"); }}>{t("Load example")}</button>
         </form>
         {error && <div className="banner warn" style={{ marginTop: 12 }}>{error}</div>}
       </Card>
 
       {result && spec && (
         <>
-          <Card title={t("Vorschlag", "Proposal")} sub={`${t("Gelesen", "Read")}: ${result.files.join(", ")}${spec.revision ? ` · ${spec.revision.slice(0, 12)}` : ""}`}>
+          <Card title={t("Proposal")} sub={`${t("Read")}: ${result.files.join(", ")}${spec.revision ? ` · ${spec.revision.slice(0, 12)}` : ""}`}>
             <div className="stack">
               {spec.notes.map((n) => <div key={n} className="banner">{n}</div>)}
               {spec.questions.map((q) => <div key={q} className="banner warn">{q}</div>)}
@@ -103,50 +103,50 @@ export function NewService() {
             </div>
           </Card>
           {spec.services.map((s, i) => (
-            <Card key={s.name} title={s.name} sub={s.image ?? (s.build_context === "." ? t("Wird aus dem Repository gebaut", "Built from the repository") : t(`Wird aus ${s.build_context} gebaut`, `Built from ${s.build_context}`))}>
+            <Card key={s.name} title={s.name} sub={s.image ?? (s.build_context === "." ? t("Built from the repository") : t("Built from {build_context}", { build_context: s.build_context }))}>
               <div className="grid cols-2">
                 <div className="stack">
-                  <h3>{t("Ports", "Ports")}</h3>
-                  {s.ports.length === 0 && <span className="muted small">{t("Keine", "None")}</span>}
+                  <h3>{t("Ports")}</h3>
+                  {s.ports.length === 0 && <span className="muted small">{t("None")}</span>}
                   {s.ports.map((p, j) => (
                     <div key={j} className="row">
                       <span className="mono" style={{ minWidth: 70 }}>{p.container}/{p.protocol}</span>
                       <select className="field" style={{ width: "auto" }} value={p.exposure} onChange={(e) => update(i, (x) => ({ ...x, ports: x.ports.map((q, k) => k === j ? { ...q, exposure: e.target.value as Port["exposure"] } : q) }))}>
-                        <option value="internal">{t("nur intern", "internal only")}</option>
-                        <option value="lan">{t("im LAN", "on the LAN")}</option>
-                        <option value="public">{t("öffentlich über HTTPS", "public via HTTPS")}</option>
+                        <option value="internal">{t("internal only")}</option>
+                        <option value="lan">{t("on the LAN")}</option>
+                        <option value="public">{t("public via HTTPS")}</option>
                       </select>
                       {p.exposure === "public" && <input className="field" style={{ flex: 1 }} placeholder="app.example.org" value={p.hostname ?? ""} onChange={(e) => update(i, (x) => ({ ...x, ports: x.ports.map((q, k) => k === j ? { ...q, hostname: e.target.value } : q) }))} />}
                     </div>
                   ))}
-                  <h3 style={{ marginTop: 10 }}>{t("Daten", "Data")}</h3>
-                  {s.volumes.length === 0 && <span className="muted small">{t("Keine dauerhaften Daten", "No persistent data")}</span>}
-                  {s.volumes.map((v) => <span key={v.name} className="small"><b>{v.name}</b> → <span className="mono">{v.path}</span> {v.backup && <span className="pill ok plain">{t("gesichert", "backed up")}</span>}</span>)}
+                  <h3 style={{ marginTop: 10 }}>{t("Data")}</h3>
+                  {s.volumes.length === 0 && <span className="muted small">{t("No persistent data")}</span>}
+                  {s.volumes.map((v) => <span key={v.name} className="small"><b>{v.name}</b> → <span className="mono">{v.path}</span> {v.backup && <span className="pill ok plain">{t("backed up")}</span>}</span>)}
                 </div>
                 <div className="stack">
-                  <h3>{t("Einstellungen", "Settings")}</h3>
+                  <h3>{t("Settings")}</h3>
                   {s.env.map((e) => (
-                    <label key={e.name} className="lbl">{e.name}{e.secret && <span className="help">{t("Geheimnis – wird verschlüsselt gespeichert, nie im Auftrag", "Secret – stored encrypted, never in the job")}</span>}
+                    <label key={e.name} className="lbl">{e.name}{e.secret && <span className="help">{t("Secret – stored encrypted, never in the job")}</span>}
                       <input className="field" type={e.secret ? "password" : "text"} defaultValue={e.secret ? "" : e.value ?? ""} autoComplete="off"
                         onChange={(ev) => !e.secret && update(i, (x) => ({ ...x, env: x.env.map((q) => q.name === e.name ? { ...q, value: ev.target.value } : q) }))} />
                     </label>
                   ))}
                   <div className="row">
                     <label className="lbl" style={{ flex: 1 }}>CPU<input className="field" type="number" step="0.25" min="0.25" value={s.cpus} onChange={(e) => update(i, (x) => ({ ...x, cpus: Number(e.target.value) }))} /></label>
-                    <label className="lbl" style={{ flex: 1 }}>{t("Speicher (MB)", "Memory (MB)")}<input className="field" type="number" step="64" min="64" value={s.memory_mb} onChange={(e) => update(i, (x) => ({ ...x, memory_mb: Number(e.target.value) }))} /></label>
+                    <label className="lbl" style={{ flex: 1 }}>{t("Memory (MB)")}<input className="field" type="number" step="64" min="64" value={s.memory_mb} onChange={(e) => update(i, (x) => ({ ...x, memory_mb: Number(e.target.value) }))} /></label>
                   </div>
                 </div>
               </div>
             </Card>
           ))}
-          <Card title={t("Wo soll es laufen?", "Where should it run?")}>
+          <Card title={t("Where should it run?")}>
             <div className="row">
               <select className="field" style={{ width: "auto" }} value={host} onChange={(e) => setHost(e.target.value)}>
                 {result.hosts.map((h) => <option key={h.id} value={h.id}>{h.name} · {h.os}</option>)}
               </select>
-              <span className="muted small">{t("Vorschlag nach freiem Speicher. Jeder Container läuft rootless, ohne Capabilities, mit Limits und eigenem Netz.", "Suggested by free memory. Every container runs rootless, without capabilities, with limits and its own network.")}</span>
+              <span className="muted small">{t("Suggested by free memory. Every container runs rootless, without capabilities, with limits and its own network.")}</span>
               <span style={{ flex: 1 }} />
-              <button className="btn primary" disabled={!host} onClick={() => flow.start(() => api.post<Job>("/api/deploy", { spec, host }))}>{t("Vorschau erstellen", "Create preview")}</button>
+              <button className="btn primary" disabled={!host} onClick={() => flow.start(() => api.post<Job>("/api/deploy", { spec, host }))}>{t("Create preview")}</button>
             </div>
           </Card>
         </>

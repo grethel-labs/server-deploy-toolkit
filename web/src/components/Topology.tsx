@@ -44,7 +44,7 @@ export function Topology({ layers, focus, clients = false, ratio = 16 / 9, onSel
         svg.removeAttribute("width");
         svg.removeAttribute("height");
         svg.setAttribute("role", "img");
-        svg.setAttribute("aria-label", t("Netzwerkkarte", "Network map"));
+        svg.setAttribute("aria-label", t("Network map"));
         cleanup.push(bindHooks(svg));
         for (const cls of [".host", ".guest", ".switch", ".gateway", ".ap", ".client", ".service", ".internet"]) {
           cleanup.push(onHook(svg, cls, ({ detail }) => {
@@ -66,8 +66,8 @@ export function Topology({ layers, focus, clients = false, ratio = 16 / 9, onSel
   return (
     <div className="topo">
       {error && <div className="banner warn">{error}</div>}
-      <div className="zoom seg" role="group" aria-label={t("Zoom", "Zoom")}>
-        <button aria-pressed={zoom === "fit"} onClick={() => setZoom("fit")}>{t("Ganz", "Fit")}</button>
+      <div className="zoom seg" role="group" aria-label={t("Zoom")}>
+        <button aria-pressed={zoom === "fit"} onClick={() => setZoom("fit")}>{t("Fit")}</button>
         <button aria-pressed={zoom === 1} onClick={() => setZoom(1)}>100 %</button>
       </div>
       <div className={`canvas${zoom === 1 ? " actual" : ""}`} style={{ aspectRatio: String(ratio), opacity: busy ? 0.5 : 1 }} aria-busy={busy}>

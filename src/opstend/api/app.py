@@ -27,7 +27,7 @@ from opstend.core.models import GuestKind, Platform
 from opstend.core.policy import Policy
 from opstend.deploy import analyzer
 from opstend.deploy.spec import WorkloadSpec, validate
-from opstend.i18n import t
+from opstend.i18n import tr
 from opstend.network import graph as netgraph
 from opstend.network import plantuml
 from opstend.runtime import Runtime
@@ -107,12 +107,19 @@ class RolloutRequest(BaseModel):
 
 
 def dump(obj: Any) -> Any:
+    """JSON-ready data with every stored text rendered in the reader's language."""
+    return i18n.localize(_raw(obj))
+
+
+def _raw(obj: Any) -> Any:
     if isinstance(obj, BaseModel):
         return obj.model_dump(mode="json")
     if isinstance(obj, list):
-        return [dump(o) for o in obj]
+        return [_raw(o) for o in obj]
+    if isinstance(obj, i18n.I18nStr):
+        return obj
     if hasattr(obj, "__dataclass_fields__"):
-        return {k: dump(v) for k, v in obj.__dict__.items()}
+        return {k: _raw(v) for k, v in obj.__dict__.items()}
     return obj
 
 
@@ -147,23 +154,17 @@ async def fetch_repo(url: str) -> tuple[dict[str, str], str | None]:
     if not m:
         raise HTTPException(
             422,
-            t(
-                "Only https://github.com/<owner>/<repo> URLs are supported yet",
-                "Unterstützt werden bisher https://github.com/<owner>/<repo>-URLs",
-            ),
+            tr("Only https://github.com/<owner>/<repo> URLs are supported yet"),
         )
     owner, repo = (quote(part, safe="") for part in m.groups())
     if owner.startswith(".") or repo.startswith("."):
-        raise HTTPException(422, t("Invalid repository URL", "Ungültige Repository-URL"))
+        raise HTTPException(422, tr("Invalid repository URL"))
     async with httpx.AsyncClient(timeout=15) as client:
         head = await client.get(f"https://api.github.com/repos/{owner}/{repo}/commits/HEAD")
         if head.status_code != 200:
             raise HTTPException(
                 404,
-                t(
-                    "Repository not found or not public",
-                    "Repository nicht gefunden oder nicht öffentlich",
-                ),
+                tr("Repository not found or not public"),
             )
         sha = head.json()["sha"]
         files: dict[str, str] = {}
@@ -225,16 +226,14 @@ def build_app(rt: Runtime) -> FastAPI:
     def current(request: Request) -> Session:
         s = sessions.get(request.cookies.get(COOKIE))
         if s is None:
-            raise HTTPException(401, t("Please sign in", "Bitte anmelden"))
+            raise HTTPException(401, tr("Please sign in"))
         return s
 
     def role(minimum: Role) -> Callable[[Request], Session]:
         def check(request: Request) -> Session:
             s = current(request)
             if RANK[s.role] < RANK[minimum]:
-                raise HTTPException(
-                    403, t("Your role does not allow this", "Deine Rolle erlaubt das nicht")
-                )
+                raise HTTPException(403, tr("Your role does not allow this"))
             return s
 
         return check
@@ -288,17 +287,12 @@ def build_app(rt: Runtime) -> FastAPI:
         if not sessions.allow_login(addr):
             raise HTTPException(
                 429,
-                t(
-                    "Too many attempts. Wait five minutes.",
-                    "Zu viele Versuche. Warte fünf Minuten.",
-                ),
+                tr("Too many attempts. Wait five minutes."),
             )
         user = rt.store.get("user", body.username.lower())
         if not user or not check_password(body.password, user["password"]):
             rt.audit.record(body.username, "session.login", "user", "refused")
-            raise HTTPException(
-                401, t("Wrong user name or password", "Benutzername oder Passwort falsch")
-            )
+            raise HTTPException(401, tr("Wrong user name or password"))
         s = sessions.create(user["id"], user["name"], Role(user["role"]), user.get("lang", "de"))
         set_cookie(response, s, request)
         rt.audit.record(s.user, "session.login", "user")
@@ -307,15 +301,11 @@ def build_app(rt: Runtime) -> FastAPI:
     @app.post("/api/setup")
     async def setup(body: Login, request: Request, response: Response) -> dict[str, Any]:
         if rt.store.list("user"):
-            raise HTTPException(
-                409, t("Setup is already done", "Die Einrichtung ist abgeschlossen")
-            )
+            raise HTTPException(409, tr("Setup is already done"))
         try:
             hashed = hash_password(body.password)
         except ValueError as exc:
-            raise HTTPException(
-                422, t("Use at least 12 characters", "Mindestens 12 Zeichen")
-            ) from exc
+            raise HTTPException(422, tr("Use at least 12 characters")) from exc
         uid = body.username.lower()
         await rt.write(
             {
@@ -344,12 +334,22 @@ def build_app(rt: Runtime) -> FastAPI:
 
     @app.put("/api/session/lang")
     async def set_lang(body: Lang, s: Session = Depends(viewer)) -> dict[str, Any]:
-        if body.lang not in i18n.LANGUAGES:
+        if body.lang not in i18n.languages():
             raise HTTPException(422, "unsupported language")
         s.lang = body.lang
         return session_json(s)
 
     # -- overview --------------------------------------------------------
+
+    @app.get("/api/i18n")
+    async def i18n_languages() -> dict[str, Any]:
+        return {"default": i18n.DEFAULT, "languages": i18n.languages()}
+
+    @app.get("/api/i18n/{lang}")
+    async def i18n_catalog(lang: str) -> Response:
+        if lang not in i18n.languages():
+            raise HTTPException(404, "unknown language")
+        return JSONResponse(i18n.catalog(lang), headers={"Cache-Control": "public, max-age=300"})
 
     @app.get("/api/overview")
     async def overview(_: Session = Depends(viewer)) -> dict[str, Any]:
@@ -568,10 +568,7 @@ def build_app(rt: Runtime) -> FastAPI:
         if insight is None or not insight.fix or insight.fix["action"] not in rt.registry.names():
             raise HTTPException(
                 404,
-                t(
-                    "No automatic fix for this insight",
-                    "Für diesen Hinweis gibt es keine automatische Lösung",
-                ),
+                tr("No automatic fix for this insight"),
             )
         params = {k: v for k, v in insight.fix.items() if k not in ("summary", "action")}
         job = await rt.engine.preview(
@@ -728,24 +725,18 @@ def build_app(rt: Runtime) -> FastAPI:
                     )
                 else:
                     continue  # application updates run through their own deploy jobs
-                step.title = t(
-                    f"Wave {w.index + 1}: {names[tid]}", f"Welle {w.index + 1}: {names[tid]}"
+                step.title = tr(
+                    "Wave {w_index_1}: {names_tid}", w_index_1=w.index + 1, names_tid=names[tid]
                 )
                 steps.append(step)
         job = await rt.engine.preview(
             Job(
-                title=t(
-                    f"Coordinated update of {len(steps)} systems",
-                    f"Abgestimmtes Update von {len(steps)} Systemen",
-                ),
+                title=tr("Coordinated update of {len_steps} systems", len_steps=len(steps)),
                 category="upgrade",
                 target="fleet",
                 requested_by=s.user,
                 steps=steps,
-                reason=t(
-                    "Waves keep quorum and update leaves before core devices",
-                    "Wellen halten das Quorum und aktualisieren Endgeräte vor dem Kern",
-                ),
+                reason=tr("Waves keep quorum and update leaves before core devices"),
             )
         )
         return dump(job)
@@ -885,7 +876,7 @@ def build_app(rt: Runtime) -> FastAPI:
         elif body.repo:
             files, revision = await fetch_repo(body.repo)
         else:
-            raise HTTPException(422, t("Give a repository URL", "Gib eine Repository-URL an"))
+            raise HTTPException(422, tr("Give a repository URL"))
         name = body.name or (body.repo or "app").rstrip("/").rsplit("/", 1)[-1]
         spec = analyzer.analyze(files, name, body.repo, revision)
         f = rt.fleet()
