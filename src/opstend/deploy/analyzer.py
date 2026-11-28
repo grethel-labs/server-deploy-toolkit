@@ -22,7 +22,7 @@ from opstend.deploy.spec import (
     VolumeSpec,
     WorkloadSpec,
 )
-from opstend.i18n import t
+from opstend.i18n import tr
 
 SECRET_HINT = re.compile(r"(PASS(WORD)?|SECRET|TOKEN|API_?KEY|PRIVATE|CREDENTIAL|DSN)", re.I)
 WEB_PORTS = {80, 443, 3000, 5000, 8000, 8080, 8443, 9000}
@@ -145,17 +145,14 @@ def from_compose(text: str, name: str) -> WorkloadSpec:
             )
         if svc.get("privileged"):
             notes.append(
-                t(
-                    f"{sname}: 'privileged' is dropped; OpsTend runs rootless without capabilities",
-                    f"{sname}: 'privileged' entfällt; OpsTend startet ohne Root und ohne Capabilities",
+                tr(
+                    "{sname}: 'privileged' is dropped; OpsTend runs rootless without capabilities",
+                    sname=sname,
                 )
             )
         if svc.get("network_mode") == "host":
             notes.append(
-                t(
-                    f"{sname}: host networking is replaced by a service network",
-                    f"{sname}: Host-Netzwerk wird durch ein eigenes Dienstnetz ersetzt",
-                )
+                tr("{sname}: host networking is replaced by a service network", sname=sname)
             )
         limits = ((svc.get("deploy") or {}).get("resources") or {}).get("limits") or {}
         mem = str(limits.get("memory", "512M")).upper()
@@ -186,17 +183,15 @@ def from_compose(text: str, name: str) -> WorkloadSpec:
         for e in service.env:
             if e.secret:
                 questions.append(
-                    t(
-                        f"Provide the secret {e.name} for {service.name}",
-                        f"Gib das Geheimnis {e.name} für {service.name} an",
+                    tr(
+                        "Provide the secret {e_name} for {service_name}",
+                        e_name=e.name,
+                        service_name=service.name,
                     )
                 )
     if any(p.exposure == Exposure.LAN for s in services for p in s.ports):
         questions.append(
-            t(
-                "Should the web interface be reachable only on the LAN or also publicly?",
-                "Soll die Weboberfläche nur im LAN oder auch öffentlich erreichbar sein?",
-            )
+            tr("Should the web interface be reachable only on the LAN or also publicly?")
         )
     return WorkloadSpec(
         name=_slug(name),
@@ -231,9 +226,8 @@ def from_dockerfile(text: str, name: str) -> WorkloadSpec:
         []
         if user
         else [
-            t(
-                "The image runs as root inside the container; it stays unprivileged on the host through user namespaces.",
-                "Das Image läuft im Container als root; auf dem Host bleibt es durch User-Namespaces ohne Rechte.",
+            tr(
+                "The image runs as root inside the container; it stays unprivileged on the host through user namespaces."
             )
         ]
     )
@@ -252,14 +246,7 @@ def from_dockerfile(text: str, name: str) -> WorkloadSpec:
         services=[svc],
         notes=notes,
         confidence=0.7,
-        questions=[]
-        if ports
-        else [
-            t(
-                "Which port does the application listen on?",
-                "Auf welchem Port lauscht die Anwendung?",
-            )
-        ],
+        questions=[] if ports else [tr("Which port does the application listen on?")],
     )
 
 
@@ -278,17 +265,12 @@ def from_manifests(files: dict[str, str], name: str) -> WorkloadSpec | None:
                 services=[svc],
                 confidence=0.5,
                 notes=[
-                    t(
-                        f"Detected a {note}. OpsTend generates a Containerfile for the build.",
-                        f"Erkannt: {note}. OpsTend erzeugt ein Containerfile für den Build.",
+                    tr(
+                        "Detected a {note}. OpsTend generates a Containerfile for the build.",
+                        note=note,
                     )
                 ],
-                questions=[
-                    t(
-                        "Check the start command and port of the application",
-                        "Prüfe Startbefehl und Port der Anwendung",
-                    )
-                ],
+                questions=[tr("Check the start command and port of the application")],
             )
     return None
 
@@ -315,10 +297,7 @@ def analyze(
             services=[],
             confidence=0.0,
             questions=[
-                t(
-                    "No container definition found. Which image or start command should run?",
-                    "Keine Container-Definition gefunden. Welches Image oder welcher Startbefehl soll laufen?",
-                )
+                tr("No container definition found. Which image or start command should run?")
             ],
         )
     example = files.get(".env.example") or files.get(".env.sample")
@@ -327,9 +306,7 @@ def analyze(
         extra = [e for e in parse_env_example(example) if e.name not in known]
         spec.services[0].env += extra
         spec.questions += [
-            t(f"Provide the secret {e.name}", f"Gib das Geheimnis {e.name} an")
-            for e in extra
-            if e.secret
+            tr("Provide the secret {e_name}", e_name=e.name) for e in extra if e.secret
         ]
     spec.source, spec.revision = source, revision
     return spec

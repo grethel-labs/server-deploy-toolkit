@@ -14,7 +14,7 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from opstend.core.models import Device, Finding, FindingKind, Severity
-from opstend.i18n import t
+from opstend.i18n import tr
 from opstend.network.graph import NetworkGraph, firewall_decision
 
 
@@ -89,23 +89,28 @@ def vlan_mismatch(g: NetworkGraph) -> list[Insight]:
                 Insight(
                     code="vlan-not-carried",
                     severity=Severity.HIGH,
-                    title=t(
-                        f"{gv.name} uses VLAN {vlan}, but {sw} port {port.a_port} does not carry it",
-                        f"{gv.name} nutzt VLAN {vlan}, aber {sw} Port {port.a_port} führt es nicht",
+                    title=tr(
+                        "{gv_name} uses VLAN {vlan}, but {sw} port {port_a_port} does not carry it",
+                        gv_name=gv.name,
+                        vlan=vlan,
+                        sw=sw,
+                        port_a_port=port.a_port,
                     ),
-                    detail=t(
-                        f"The guest's NIC is tagged {vlan}{netname}. The switch port to {hname} "
-                        f"carries native {port.native_vlan or 1} and tagged {tagged}. The switch "
-                        "drops this guest's traffic.",
-                        f"Die Netzwerkkarte des Gasts ist mit {vlan}{netname} markiert. Der "
-                        f"Switch-Port zu {hname} führt nativ {port.native_vlan or 1} und getaggt "
-                        f"{tagged}. Der Switch verwirft den Verkehr dieses Gasts.",
+                    detail=tr(
+                        "The guest's NIC is tagged {vlan}{netname}. The switch port to {hname} carries native {port_native_vlan_or_1} and tagged {tagged}. The switch drops this guest's traffic.",
+                        vlan=vlan,
+                        netname=netname,
+                        hname=hname,
+                        port_native_vlan_or_1=port.native_vlan or 1,
+                        tagged=tagged,
                     ),
                     objects=[gid, host, switch],
                     fix={
-                        "summary": t(
-                            f"Allow VLAN {vlan} on {sw} port {port.a_port}",
-                            f"VLAN {vlan} an {sw} Port {port.a_port} erlauben",
+                        "summary": tr(
+                            "Allow VLAN {vlan} on {sw} port {port_a_port}",
+                            vlan=vlan,
+                            sw=sw,
+                            port_a_port=port.a_port,
                         ),
                         "action": "unifi.port_vlans",
                         "device": switch,
@@ -130,21 +135,20 @@ def bridge_not_vlan_aware(g: NetworkGraph) -> list[Insight]:
                 Insight(
                     code="bridge-not-vlan-aware",
                     severity=Severity.HIGH,
-                    title=t(
-                        f"Bridge {bv.name} is not VLAN-aware but carries tagged guests",
-                        f"Bridge {bv.name} ist nicht VLAN-fähig, trägt aber getaggte Gäste",
+                    title=tr(
+                        "Bridge {bv_name} is not VLAN-aware but carries tagged guests",
+                        bv_name=bv.name,
                     ),
-                    detail=t(
-                        f"{names} use VLAN tags on {bv.name}. Without VLAN awareness the tags do "
-                        "not reach the physical network as intended.",
-                        f"{names} nutzen VLAN-Tags auf {bv.name}. Ohne VLAN-Fähigkeit kommen die "
-                        "Tags nicht wie gedacht im physischen Netz an.",
+                    detail=tr(
+                        "{names} use VLAN tags on {bv_name}. Without VLAN awareness the tags do not reach the physical network as intended.",
+                        names=names,
+                        bv_name=bv.name,
                     ),
                     objects=[bid, *tagged],
                     fix={
-                        "summary": t(
-                            f"Make {bv.name} VLAN-aware (short network interruption)",
-                            f"{bv.name} VLAN-fähig machen (kurze Netzunterbrechung)",
+                        "summary": tr(
+                            "Make {bv_name} VLAN-aware (short network interruption)",
+                            bv_name=bv.name,
                         ),
                         "action": "host.bridge_vlan_aware",
                         "bridge": bid,
@@ -180,18 +184,16 @@ def slow_links(g: NetworkGraph, devices: list[Device]) -> list[Insight]:
                     Insight(
                         code="link-downgraded",
                         severity=Severity.MEDIUM,
-                        title=t(
-                            f"{d.name} port {p.index}{peer} runs at {p.speed_mbps} instead of "
-                            f"{p.max_speed_mbps} Mbit/s",
-                            f"{d.name} Port {p.index}{peer} läuft mit {p.speed_mbps} statt "
-                            f"{p.max_speed_mbps} Mbit/s",
+                        title=tr(
+                            "{d_name} port {index}{peer} runs at {speed_mbps} instead of {max_speed_mbps} Mbit/s",
+                            d_name=d.name,
+                            index=p.index,
+                            peer=peer,
+                            speed_mbps=p.speed_mbps,
+                            max_speed_mbps=p.max_speed_mbps,
                         ),
-                        detail=t(
-                            "Both sides support a faster link. A damaged cable or a bad connector "
-                            "usually causes this. Replace the cable or reseat the connector.",
-                            "Beide Seiten können schneller. Meist ist ein beschädigtes Kabel oder "
-                            "ein schlechter Stecker die Ursache. Kabel tauschen oder Stecker "
-                            "neu einstecken.",
+                        detail=tr(
+                            "Both sides support a faster link. A damaged cable or a bad connector usually causes this. Replace the cable or reseat the connector."
                         ),
                         objects=[d.id],
                         tags=["cabling"],
@@ -210,15 +212,14 @@ def port_errors(devices: list[Device], threshold: int = 100) -> list[Insight]:
                     Insight(
                         code="port-errors",
                         severity=Severity.MEDIUM,
-                        title=t(
-                            f"{d.name} port {p.index} has {errors} transmission errors",
-                            f"{d.name} Port {p.index} hat {errors} Übertragungsfehler",
+                        title=tr(
+                            "{d_name} port {index} has {errors} transmission errors",
+                            d_name=d.name,
+                            index=p.index,
+                            errors=errors,
                         ),
-                        detail=t(
-                            "Frequent errors point to a bad cable, interference or a duplex "
-                            "mismatch.",
-                            "Häufige Fehler deuten auf ein schlechtes Kabel, "
-                            "Störungen oder unterschiedliche Duplex-Einstellungen hin.",
+                        detail=tr(
+                            "Frequent errors point to a bad cable, interference or a duplex mismatch."
                         ),
                         objects=[d.id],
                     )
@@ -228,15 +229,11 @@ def port_errors(devices: list[Device], threshold: int = 100) -> list[Insight]:
                     Insight(
                         code="half-duplex",
                         severity=Severity.MEDIUM,
-                        title=t(
-                            f"{d.name} port {p.index} runs half duplex",
-                            f"{d.name} Port {p.index} läuft im Halbduplex",
+                        title=tr(
+                            "{d_name} port {index} runs half duplex", d_name=d.name, index=p.index
                         ),
-                        detail=t(
-                            "Half duplex causes collisions and slow transfers. Check fixed speed "
-                            "settings on the other side.",
-                            "Halbduplex führt zu Kollisionen und "
-                            "langsamen Übertragungen. Prüfe feste Geschwindigkeiten der Gegenseite.",
+                        detail=tr(
+                            "Half duplex causes collisions and slow transfers. Check fixed speed settings on the other side."
                         ),
                         objects=[d.id],
                     )
@@ -255,15 +252,14 @@ def poe_budget(devices: list[Device], warn: float = 0.8) -> list[Insight]:
                 Insight(
                     code="poe-budget",
                     severity=Severity.HIGH if used >= d.poe_budget_watts else Severity.MEDIUM,
-                    title=t(
-                        f"{d.name} uses {used:.0f} of {d.poe_budget_watts:.0f} W PoE budget",
-                        f"{d.name} nutzt {used:.0f} von {d.poe_budget_watts:.0f} W PoE-Budget",
+                    title=tr(
+                        "{d_name} uses {used:.0f} of {d_poe_budget_watts:.0f} W PoE budget",
+                        d_name=d.name,
+                        used=used,
+                        d_poe_budget_watts=d.poe_budget_watts,
                     ),
-                    detail=t(
-                        "When the budget runs out the switch turns PoE ports off. Move a powered "
-                        "device to another switch or use an injector.",
-                        "Ist das Budget erschöpft, schaltet der Switch PoE-Ports ab. Hänge ein "
-                        "Gerät an einen anderen Switch oder nutze einen Injektor.",
+                    detail=tr(
+                        "When the budget runs out the switch turns PoE ports off. Move a powered device to another switch or use an injector."
                     ),
                     objects=[d.id],
                 )
@@ -289,15 +285,9 @@ def single_points_of_failure(g: NetworkGraph, voters: list[str]) -> list[Insight
                 Insight(
                     code="voters-share-switch",
                     severity=Severity.MEDIUM,
-                    title=t(
-                        f"All OpsTend voters depend on {sw}", f"Alle OpsTend-Voter hängen an {sw}"
-                    ),
-                    detail=t(
-                        "If this switch fails, the control plane loses its majority and automatic "
-                        "repairs pause until it returns. Connect one voter to another switch.",
-                        "Fällt dieser Switch aus, verliert die Steuerung ihre Mehrheit und "
-                        "automatische Reparaturen pausieren. Schließe einen Voter an einen "
-                        "anderen Switch an.",
+                    title=tr("All OpsTend voters depend on {sw}", sw=sw),
+                    detail=tr(
+                        "If this switch fails, the control plane loses its majority and automatic repairs pause until it returns. Connect one voter to another switch."
                     ),
                     objects=[switch, *sorted(hosts)],
                 )
@@ -315,13 +305,8 @@ def duplicate_ips(g: NetworkGraph) -> list[Insight]:
         Insight(
             code="duplicate-ip",
             severity=Severity.HIGH,
-            title=t(
-                f"{ip} is used by {len(ids)} systems", f"{ip} wird von {len(ids)} Systemen genutzt"
-            ),
-            detail=t(
-                "Duplicate addresses cause intermittent outages. Use DHCP reservations.",
-                "Doppelte Adressen führen zu sporadischen Ausfällen. Nutze DHCP-Reservierungen.",
-            ),
+            title=tr("{ip} is used by {len_ids} systems", ip=ip, len_ids=len(ids)),
+            detail=tr("Duplicate addresses cause intermittent outages. Use DHCP reservations."),
             objects=ids,
         )
         for ip, ids in seen.items()
@@ -341,15 +326,14 @@ def wrong_subnet(g: NetworkGraph) -> list[Insight]:
                 Insight(
                     code="client-wrong-subnet",
                     severity=Severity.MEDIUM,
-                    title=t(
-                        f"{v.name} has an address of {by_ip.name} but sits in {by_vlan.name}",
-                        f"{v.name} hat eine Adresse aus {by_ip.name}, steckt aber in {by_vlan.name}",
+                    title=tr(
+                        "{v_name} has an address of {by_ip_name} but sits in {by_vlan_name}",
+                        v_name=v.name,
+                        by_ip_name=by_ip.name,
+                        by_vlan_name=by_vlan.name,
                     ),
-                    detail=t(
-                        "A static address that does not match the VLAN breaks routing for this "
-                        "client.",
-                        "Eine feste Adresse, die nicht zum VLAN passt, stört das "
-                        "Routing dieses Clients.",
+                    detail=tr(
+                        "A static address that does not match the VLAN breaks routing for this client."
                     ),
                     objects=[vid],
                 )
@@ -366,14 +350,12 @@ def weak_wifi(g: NetworkGraph, threshold: int = -75) -> list[Insight]:
                 Insight(
                     code="weak-wifi",
                     severity=Severity.LOW,
-                    title=t(
-                        f"{v.name} has a weak Wi-Fi signal ({signal} dBm)",
-                        f"{v.name} hat schwachen WLAN-Empfang ({signal} dBm)",
+                    title=tr(
+                        "{v_name} has a weak Wi-Fi signal ({signal} dBm)",
+                        v_name=v.name,
+                        signal=signal,
                     ),
-                    detail=t(
-                        "Below -75 dBm throughput drops and roaming becomes unreliable.",
-                        "Unter -75 dBm sinkt der Durchsatz und das Roaming wird unzuverlässig.",
-                    ),
+                    detail=tr("Below -75 dBm throughput drops and roaming becomes unreliable."),
                     objects=[vid],
                 )
             )
@@ -393,19 +375,20 @@ def segmentation(g: NetworkGraph) -> list[Insight]:
                     Insight(
                         code="segmentation-open",
                         severity=Severity.HIGH,
-                        title=t(
-                            f"{src.name} can reach {dst.name}", f"{src.name} erreicht {dst.name}"
+                        title=tr(
+                            "{src_name} can reach {dst_name}", src_name=src.name, dst_name=dst.name
                         ),
-                        detail=t(
-                            f"Devices in {src.name} are usually less trusted. Reason: {why}.",
-                            f"Geräte in {src.name} sind meist weniger vertrauenswürdig. "
-                            f"Grund: {why}.",
+                        detail=tr(
+                            "Devices in {src_name} are usually less trusted. Reason: {why}.",
+                            src_name=src.name,
+                            why=why,
                         ),
                         objects=[f"network:{src.id}", f"network:{dst.id}"],
                         fix={
-                            "summary": t(
-                                f"Block {src.name} → {dst.name} except required ports",
-                                f"{src.name} → {dst.name} sperren, nötige Ports ausgenommen",
+                            "summary": tr(
+                                "Block {src_name} → {dst_name} except required ports",
+                                src_name=src.name,
+                                dst_name=dst.name,
                             ),
                             "action": "unifi.firewall_block",
                             "src": src.id,

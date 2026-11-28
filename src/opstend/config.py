@@ -25,7 +25,6 @@ class NodeConfig(Strict):
     address: str = "127.0.0.1"
     site: str = "default"
     labels: dict[str, str] = Field(default_factory=dict)
-    language: str = "de"  # language of texts written by background automation
 
 
 class Listen(Strict):

@@ -144,6 +144,15 @@ jobs:
       - run: shellcheck -S warning -s sh -e SC1008,SC2034 packaging/openrc/*
       - run: systemd-analyze verify --man=no packaging/systemd/*.service || true
 
+  dependencies:
+    name: Dependency review
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/dependency-review-action@bbc44d14a204704ccc493733616cd1e93a0321ec # v5.0.1
+        with:
+          fail-on-severity: high
+
   ci-ok:
     name: CI passed
     if: always()

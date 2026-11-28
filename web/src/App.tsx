@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { api, offline, onLive, setCsrf, type Device, type Guest, type Host, type Session } from "./api";
 import { Icon } from "./components/Icon";
 import { Zorec } from "./components/Zorec";
-import { applyTheme, go, href, LangContext, SessionContext, storedTheme, useData, useRoute, useT, type Lang, type Theme } from "./lib";
+import { applyTheme, go, href, LangContext, loadCatalog, type Catalog, SessionContext, storedTheme, useData, useRoute, useT, type Lang, type Theme } from "./lib";
 import { Cluster } from "./pages/Cluster";
 import { DeviceDetail, GuestDetail, HostDetail, ObjectRedirect } from "./pages/Details";
 import { Infrastructure } from "./pages/Infrastructure";
@@ -17,6 +17,7 @@ import { Updates } from "./pages/Updates";
 
 export function App() {
   const [session, setSession] = useState<Session | null>(null);
+  const [catalog, setCatalog] = useState<Catalog | null>(null);
   const refresh = () =>
     api.get<Session>("/api/session").then((s) => {
       setCsrf(s.csrf);
@@ -26,11 +27,14 @@ export function App() {
     refresh();
     applyTheme(storedTheme());
   }, []);
-  if (!session) return null;
-  const lang: Lang = session.lang ?? (navigator.language.startsWith("de") ? "de" : "en");
+  const lang: Lang = session?.lang ?? navigator.language.slice(0, 2);
+  useEffect(() => {
+    if (session) loadCatalog(lang).then(setCatalog);
+  }, [session, lang]);
+  if (!session || !catalog) return null;
   document.documentElement.lang = lang;
   return (
-    <LangContext.Provider value={lang}>
+    <LangContext.Provider value={{ lang, catalog }}>
       <SessionContext.Provider value={{ session, refresh }}>
         {session.user ? <Shell /> : <Login setup={!!session.setup} onDone={refresh} />}
       </SessionContext.Provider>
@@ -55,15 +59,15 @@ function Shell() {
   const decisions = ov?.decisions.length ?? 0;
   const working = ov?.working.length ?? 0;
   const nav: { group?: string; path: string; icon: string; label: string; badge?: number }[] = [
-    { path: "/", icon: "ops", label: t("Betrieb", "Operations"), badge: decisions },
-    { group: t("Infrastruktur", "Infrastructure"), path: "/infra", icon: "server", label: t("Hosts und Gäste", "Hosts and guests") },
-    { path: "/services", icon: "box", label: t("Dienste", "Services") },
-    { path: "/network", icon: "network", label: t("Netzwerk", "Network") },
-    { group: t("Pflege", "Care"), path: "/security", icon: "shield", label: t("Sicherheit", "Security") },
+    { path: "/", icon: "ops", label: t("Operations"), badge: decisions },
+    { group: t("Infrastructure"), path: "/infra", icon: "server", label: t("Hosts and guests") },
+    { path: "/services", icon: "box", label: t("Services") },
+    { path: "/network", icon: "network", label: t("Network") },
+    { group: t("Care"), path: "/security", icon: "shield", label: t("Security") },
     { path: "/updates", icon: "refresh", label: "Updates" },
-    { path: "/jobs", icon: "list", label: t("Aufträge und Protokoll", "Jobs and log") },
-    { group: "OpsTend", path: "/cluster", icon: "cluster", label: t("Cluster und Rollen", "Cluster and roles") },
-    { path: "/settings", icon: "settings", label: t("Einstellungen", "Settings") },
+    { path: "/jobs", icon: "list", label: t("Jobs and log") },
+    { group: "OpsTend", path: "/cluster", icon: "cluster", label: t("Cluster and roles") },
+    { path: "/settings", icon: "settings", label: t("Settings") },
   ];
 
   function cycleTheme() {
@@ -93,14 +97,14 @@ function Shell() {
   }, [route.path, route.params.toString(), theme]);
 
   const status = working > 0
-    ? { busy: true, label: t(`Arbeitet an ${working} Auftrag${working > 1 ? "en" : ""}`, `Working on ${working} job${working > 1 ? "s" : ""}`) }
+    ? { busy: true, label: working === 1 ? t("Working on {count} job", { count: working }) : t("Working on {count} jobs", { count: working }) }
     : decisions > 0
-      ? { busy: false, label: t(`${decisions} Entscheidung${decisions > 1 ? "en" : ""} offen`, `${decisions} decision${decisions > 1 ? "s" : ""} open`) }
-      : { busy: false, label: t("Alles ruhig", "All quiet") };
+      ? { busy: false, label: decisions === 1 ? t("{count} decision open", { count: decisions }) : t("{count} decisions open", { count: decisions }) }
+      : { busy: false, label: t("All quiet") };
 
   return (
     <div className="shell">
-      <nav className={`nav${menu ? " open" : ""}`} aria-label={t("Hauptnavigation", "Main navigation")}>
+      <nav className={`nav${menu ? " open" : ""}`} aria-label={t("Main navigation")}>
         <a className="brand" href={href("/")}>
           <img src="/brand/opstend-dark.svg" alt="" />
           <span><b>OpsTend</b><small>by Grethel Labs</small></span>
@@ -114,34 +118,34 @@ function Shell() {
             </a>
           </div>
         ))}
-        <div className="foot">OpsTend · {t("Live", "Live")}{live ? " ●" : ""}</div>
+        <div className="foot">OpsTend · {t("Live")}{live ? " ●" : ""}</div>
       </nav>
       <div className="main">
         <header className="top">
-          <button className="icon-btn menu-btn" onClick={() => setMenu((m) => !m)} aria-label={t("Menü", "Menu")}>
+          <button className="icon-btn menu-btn" onClick={() => setMenu((m) => !m)} aria-label={t("Menu")}>
             <Icon name="menu" />
           </button>
           <Search />
           <div className="spacer" />
-          <button className="icon-btn" onClick={cycleTheme} title={t(`Darstellung: ${theme}`, `Theme: ${theme}`)} aria-label={t("Darstellung wechseln", "Change theme")}>
+          <button className="icon-btn" onClick={cycleTheme} title={t("Theme: {theme}", { theme })} aria-label={t("Change theme")}>
             <Icon name={theme === "dark" ? "moon" : "sun"} />
           </button>
         </header>
         <main className="content" id="main">
-          {offline && <div className="banner warn">{t("Offline: du siehst den zuletzt geladenen Stand.", "Offline: you are seeing the last loaded state.")}</div>}
+          {offline && <div className="banner warn">{t("Offline: you are seeing the last loaded state.")}</div>}
           {page}
         </main>
       </div>
-      <nav className="tabbar" aria-label={t("Schnellnavigation", "Quick navigation")}>
+      <nav className="tabbar" aria-label={t("Quick navigation")}>
         {[
-          { path: "/", icon: "ops", label: t("Betrieb", "Ops") },
-          { path: "/infra", icon: "server", label: t("Systeme", "Systems") },
-          { path: "/network", icon: "network", label: t("Netz", "Network") },
-          { path: "/jobs", icon: "list", label: t("Aufträge", "Jobs") },
+          { path: "/", icon: "ops", label: t("Ops") },
+          { path: "/infra", icon: "server", label: t("Systems") },
+          { path: "/network", icon: "network", label: t("Network") },
+          { path: "/jobs", icon: "list", label: t("Jobs") },
         ].map((n) => (
           <a key={n.path} href={href(n.path)} aria-current={section === n.path ? "page" : undefined}><Icon name={n.icon} size={22} />{n.label}</a>
         ))}
-        <a href="#" onClick={(e) => { e.preventDefault(); setMenu(true); }}><Icon name="menu" size={22} />{t("Mehr", "More")}</a>
+        <a href="#" onClick={(e) => { e.preventDefault(); setMenu(true); }}><Icon name="menu" size={22} />{t("More")}</a>
       </nav>
       <Zorec status={status} />
     </div>
@@ -163,9 +167,9 @@ function Search() {
   return (
     <div className="search">
       <Icon name="search" size={16} />
-      <label className="sr-only" htmlFor="global-search">{t("Suche", "Search")}</label>
+      <label className="sr-only" htmlFor="global-search">{t("Search")}</label>
       <input id="global-search" value={q} onChange={(e) => setQ(e.target.value)} onKeyDown={(e) => { if (e.key === "Escape") setQ(""); if (e.key === "Enter" && hits[0]) { go(hits[0].to); setQ(""); } }}
-        placeholder={t("Host, Gast, Gerät oder Adresse suchen", "Search host, guest, device or address")} autoComplete="off" />
+        placeholder={t("Search host, guest, device or address")} autoComplete="off" />
       {hits.length > 0 && (
         <div className="search-results" role="listbox">
           {hits.map((h) => (

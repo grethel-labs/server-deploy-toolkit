@@ -10,9 +10,7 @@ from opstend.runtime import Runtime
 
 @pytest.fixture
 def client():
-    config = Config()
-    config.node.language = "en"
-    rt = Runtime(config, demo=True, demo_delay=0.0)
+    rt = Runtime(Config(), demo=True, demo_delay=0.0)
     with TestClient(build_app(rt)) as c:
         s = c.get("/api/session", headers={"accept-language": "en"}).json()
         c.headers["x-csrf-token"] = s["csrf"]

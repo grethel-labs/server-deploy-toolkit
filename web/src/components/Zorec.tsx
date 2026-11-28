@@ -68,17 +68,17 @@ export function Zorec({ status }: { status: { busy: boolean; label: string } }) 
   }
 
   const suggestions = [
-    t("Was ist gerade los?", "What is going on?"),
-    t("Welche Updates gibt es?", "Which updates are available?"),
-    t("Was fällt dir im Netzwerk auf?", "Anything odd in the network?"),
-    t("Wie steht es um die Sicherheit?", "How is security?"),
+    t("What is going on?"),
+    t("Which updates are available?"),
+    t("Anything odd in the network?"),
+    t("How is security?"),
   ];
 
   if (!open) {
     return (
-      <button className={`zorec-fab${status.busy ? " busy" : ""}`} onClick={() => setOpen(true)} aria-label={t("Zorec fragen", "Ask Zorec")}>
+      <button className={`zorec-fab${status.busy ? " busy" : ""}`} onClick={() => setOpen(true)} aria-label={t("Ask Zorec")}>
         <img src="/brand/zorec.svg" alt="" />
-        <span>{t("Zorec fragen", "Ask Zorec")}<small>{status.label}</small></span>
+        <span>{t("Ask Zorec")}<small>{status.label}</small></span>
       </button>
     );
   }
@@ -92,24 +92,23 @@ export function Zorec({ status }: { status: { busy: boolean; label: string } }) 
           <div className="small muted">{status.label}</div>
         </div>
         {canEdit && (
-          <div className="seg" role="group" aria-label={t("Modus", "Mode")}>
-            <button aria-pressed={mode === "read"} onClick={() => setMode("read")}>{t("Lesen", "Read")}</button>
-            <button aria-pressed={mode === "edit"} onClick={() => setMode("edit")}>{t("Ändern", "Change")}</button>
+          <div className="seg" role="group" aria-label={t("Mode")}>
+            <button aria-pressed={mode === "read"} onClick={() => setMode("read")}>{t("Read")}</button>
+            <button aria-pressed={mode === "edit"} onClick={() => setMode("edit")}>{t("Change")}</button>
           </div>
         )}
-        <button className="icon-btn" onClick={() => setOpen(false)} aria-label={t("Schließen", "Close")}><Icon name="close" /></button>
+        <button className="icon-btn" onClick={() => setOpen(false)} aria-label={t("Close")}><Icon name="close" /></button>
       </header>
       <div className="log" aria-live="polite">
         {log.length === 0 && (
           <div className="msg">
-            {t("Ich kenne den aktuellen Zustand deiner Systeme. Frag mich etwas – im Modus „Ändern“ schlage ich Aufträge vor, die du freigibst.",
-               "I know the current state of your systems. Ask me anything – in “Change” mode I suggest jobs for you to approve.")}
+            {t("I know the current state of your systems. Ask me anything – in “Change” mode I suggest jobs for you to approve.")}
           </div>
         )}
         {log.map((m, i) => (
           <div key={i} className={`msg${m.role === "user" ? " me" : ""}`}>
             {m.role === "assistant" && m.answer && (
-              <div className="meta">Zorec · {m.answer.source === "model" ? m.answer.model : t("ohne Sprachmodell", "rule based")}</div>
+              <div className="meta">Zorec · {m.answer.source === "model" ? m.answer.model : t("rule based")}</div>
             )}
             {m.text}
             {m.answer && (m.answer.links.length > 0 || m.answer.actions.length > 0) && (
@@ -122,7 +121,7 @@ export function Zorec({ status }: { status: { busy: boolean; label: string } }) 
             )}
           </div>
         ))}
-        {busy && <div className="msg muted">{t("Zorec prüft …", "Zorec is checking …")}</div>}
+        {busy && <div className="msg muted">{t("Zorec is checking …")}</div>}
         <div ref={end} />
       </div>
       <footer>
@@ -130,10 +129,10 @@ export function Zorec({ status }: { status: { busy: boolean; label: string } }) 
           {suggestions.map((s) => <button key={s} onClick={() => ask(s)}>{s}</button>)}
         </div>
         <form className="row" onSubmit={(e) => { e.preventDefault(); ask(text); }}>
-          <label className="sr-only" htmlFor="zorec-q">{t("Frage an Zorec", "Question for Zorec")}</label>
+          <label className="sr-only" htmlFor="zorec-q">{t("Question for Zorec")}</label>
           <input id="zorec-q" className="field" style={{ flex: 1 }} value={text} onChange={(e) => setText(e.target.value)}
-            placeholder={t("Frag nach einem Dienst, Gerät oder Vorgang", "Ask about a service, device or job")} />
-          <button className="btn primary" disabled={busy || !text.trim()}>{t("Senden", "Send")}</button>
+            placeholder={t("Ask about a service, device or job")} />
+          <button className="btn primary" disabled={busy || !text.trim()}>{t("Send")}</button>
         </form>
       </footer>
       {flow.dialog}

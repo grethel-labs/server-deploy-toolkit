@@ -11,7 +11,9 @@ from datetime import UTC, datetime
 from enum import StrEnum
 from typing import Any
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
+
+from opstend import i18n
 
 
 def utcnow() -> datetime:
@@ -20,6 +22,25 @@ def utcnow() -> datetime:
 
 class Model(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=False, use_enum_values=True)
+
+
+class Localized(Model):
+    """A stored object whose texts can be rendered in each reader's language."""
+
+    i18n: dict[str, Any] = Field(default_factory=dict)
+
+    @model_validator(mode="before")
+    @classmethod
+    def _capture_texts(cls, data: Any) -> Any:
+        if isinstance(data, dict):
+            found = i18n.capture(data)
+            if found:
+                data = {**data, "i18n": {**data.get("i18n", {}), **found}}
+        return data
+
+    def remember_texts(self, *fields: str) -> None:
+        """Keep templates of texts assigned after construction."""
+        self.i18n.update(i18n.capture({f: getattr(self, f) for f in fields}))
 
 
 class Health(StrEnum):
@@ -318,7 +339,7 @@ class FindingKind(StrEnum):
     CONFIGURATION = "configuration"
 
 
-class Finding(Model):
+class Finding(Localized):
     id: str
     target: str
     kind: FindingKind

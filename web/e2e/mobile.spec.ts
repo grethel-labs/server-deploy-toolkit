@@ -6,7 +6,7 @@ test("phone layout uses the tab bar and has no horizontal scroll", async ({ page
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
   expect(overflow).toBeLessThanOrEqual(1);
   await page.getByRole("navigation", { name: "Schnellnavigation" }).getByRole("link", { name: "Netz" }).click();
-  await expect(page.getByRole("heading", { name: "Netzwerk" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Netzwerk", exact: true })).toBeVisible();
 });
 
 test("the app is installable as a PWA", async ({ page }) => {

@@ -39,16 +39,16 @@ const TONE: Record<string, string> = {
 export function Pill({ state, children }: { state: string; children?: ReactNode }) {
   const t = useT();
   const labels: Record<string, string> = {
-    ok: t("Gesund", "Healthy"), warning: t("Warnung", "Warning"), critical: t("Störung", "Failing"),
-    unknown: t("Unbekannt", "Unknown"), maintenance: t("Wartung", "Maintenance"),
-    running: t("Läuft", "Running"), stopped: t("Gestoppt", "Stopped"), paused: t("Pausiert", "Paused"),
-    awaiting_approval: t("Wartet auf Freigabe", "Awaiting approval"), scheduled: t("Eingeplant", "Scheduled"),
-    verifying: t("Prüft Ergebnis", "Verifying"), succeeded: t("Erledigt", "Done"), failed: t("Fehlgeschlagen", "Failed"),
-    rolled_back: t("Zurückgerollt", "Rolled back"), rejected: t("Abgelehnt", "Rejected"), previewed: t("Vorschau", "Preview"),
-    handling: t("Wird behoben", "Being fixed"), waiting: t("Wartet", "Waiting"), needs_operator: t("Braucht dich", "Needs you"),
-    critical_sev: "", high: t("Hoch", "High"), medium: t("Mittel", "Medium"), low: t("Niedrig", "Low"),
-    healthy: t("Gesund", "Healthy"), suspect: t("Verdächtig", "Suspect"), down: t("Ausgefallen", "Down"),
-    joining: t("Tritt bei", "Joining"), draining: t("Wird geleert", "Draining"),
+    ok: t("Healthy"), warning: t("Warning"), critical: t("Failing"),
+    unknown: t("Unknown"), maintenance: t("Maintenance"),
+    running: t("Running"), stopped: t("Stopped"), paused: t("Paused"),
+    awaiting_approval: t("Awaiting approval"), scheduled: t("Scheduled"),
+    verifying: t("Verifying"), succeeded: t("Done"), failed: t("Failed"),
+    rolled_back: t("Rolled back"), rejected: t("Rejected"), previewed: t("Preview"),
+    handling: t("Being fixed"), waiting: t("Waiting"), needs_operator: t("Needs you"),
+    critical_sev: "", high: t("High"), medium: t("Medium"), low: t("Low"),
+    healthy: t("Healthy"), suspect: t("Suspect"), down: t("Down"),
+    joining: t("Joining"), draining: t("Draining"),
   };
   const tone = TONE[state] ?? "plain";
   return <span className={`pill ${tone}`}>{children ?? labels[state] ?? state}</span>;
@@ -75,7 +75,7 @@ export function Empty({ children }: { children: ReactNode }) {
 
 export function Loading() {
   const t = useT();
-  return <div className="empty">{t("Lädt …", "Loading …")}</div>;
+  return <div className="empty">{t("Loading …")}</div>;
 }
 
 export function Dialog({ open, onClose, title, children, footer }: { open: boolean; onClose: () => void; title: ReactNode; children: ReactNode; footer?: ReactNode }) {
@@ -133,25 +133,25 @@ export function useJobFlow() {
     <Dialog
       open={job !== null || error !== null}
       onClose={() => { setJob(null); setError(null); }}
-      title={job ? job.title : t("Das ging nicht", "That did not work")}
+      title={job ? job.title : t("That did not work")}
       footer={
         <>
-          <button className="btn" onClick={() => { setJob(null); setError(null); }}>{t("Abbrechen", "Cancel")}</button>
-          {job && <a className="btn" href={href(`/jobs/${job.id}`)} onClick={() => setJob(null)}>{t("Später entscheiden", "Decide later")}</a>}
-          {job && <button className="btn primary" disabled={busy} onClick={approve}>{t("Freigeben und ausführen", "Approve and run")}</button>}
+          <button className="btn" onClick={() => { setJob(null); setError(null); }}>{t("Cancel")}</button>
+          {job && <a className="btn" href={href(`/jobs/${job.id}`)} onClick={() => setJob(null)}>{t("Decide later")}</a>}
+          {job && <button className="btn primary" disabled={busy} onClick={approve}>{t("Approve and run")}</button>}
         </>
       }
     >
       {error && <div className="banner warn">{error}</div>}
       {job && (
         <>
-          <p className="muted small">{t("Das passiert, wenn du freigibst. OpsTend prüft das Ergebnis danach selbst.", "This happens when you approve. OpsTend checks the result afterwards.")}</p>
+          <p className="muted small">{t("This happens when you approve. OpsTend checks the result afterwards.")}</p>
           <ol className="steps">
             {job.steps.map((s, i) => (
               <li key={i}><span className="dot">{i + 1}</span><div>{s.title || s.effect}</div></li>
             ))}
           </ol>
-          {job.reason && <p className="small muted">{t("Anlass", "Reason")}: {job.reason}</p>}
+          {job.reason && <p className="small muted">{t("Reason")}: {job.reason}</p>}
         </>
       )}
     </Dialog>

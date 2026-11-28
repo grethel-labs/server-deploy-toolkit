@@ -24,7 +24,7 @@ from datetime import UTC, datetime, timedelta
 from opstend.core.jobs import Engine, Job, Step
 from opstend.core.models import Finding, Node, NodeState, Service, Severity, Update
 from opstend.core.policy import Category, Governor, Verdict
-from opstend.i18n import t
+from opstend.i18n import tr
 from opstend.selfmanage.health import ProbeResult
 
 
@@ -84,11 +84,8 @@ class Reconciler:
                     Proposal(
                         Category.RESTART,
                         f"service/{svc.id}",
-                        t(f"Restart {svc.name}", f"{svc.name} neu starten"),
-                        t(
-                            f"{self.failures} health checks in a row failed",
-                            f"{self.failures} Gesundheitsprüfungen in Folge fehlgeschlagen",
-                        ),
+                        tr("Restart {svc_name}", svc_name=svc.name),
+                        tr("{failures} health checks in a row failed", failures=self.failures),
                         [Step(action="service.restart", params={"service": svc.id})],
                         key=f"restart:{svc.id}",
                     )
@@ -99,10 +96,11 @@ class Reconciler:
                     Proposal(
                         Category.RESCHEDULE,
                         f"node/{node.id}",
-                        t(f"Move roles off {node.name}", f"Rollen von {node.name} verlagern"),
-                        t(
-                            f"{node.name} has not reported since {node.last_seen:%H:%M}",
-                            f"{node.name} meldet sich seit {node.last_seen:%H:%M} nicht",
+                        tr("Move roles off {node_name}", node_name=node.name),
+                        tr(
+                            "{node_name} has not reported since {node_last_seen:%H:%M}",
+                            node_name=node.name,
+                            node_last_seen=node.last_seen,
                         ),
                         [Step(action="cluster.replace_node", params={"node": node.id})],
                         urgent=True,
@@ -117,15 +115,13 @@ class Reconciler:
                         Proposal(
                             Category.QUARANTINE,
                             f.target,
-                            t(
-                                f"Withdraw public access to {obs.name(service)}",
-                                f"Öffentlichen Zugang zu {obs.name(service)} zurückziehen",
+                            tr(
+                                "Withdraw public access to {obs_name_service}",
+                                obs_name_service=obs.name(service),
                             ),
-                            t(
-                                f"{f.cve} is known to be exploited and the service is reachable from "
-                                "the internet",
-                                f"{f.cve} wird aktiv ausgenutzt und der Dienst ist aus "
-                                "dem Internet erreichbar",
+                            tr(
+                                "{f_cve} is known to be exploited and the service is reachable from the internet",
+                                f_cve=f.cve,
                             ),
                             [
                                 Step(
@@ -147,16 +143,14 @@ class Reconciler:
                 Proposal(
                     Category.PATCH,
                     target,
-                    t(
-                        f"Install {len(ups)} security updates on {obs.name(target)}",
-                        f"{len(ups)} Sicherheitsupdates auf {obs.name(target)} installieren",
+                    tr(
+                        "Install {len_ups} security updates on {obs_name_target}",
+                        len_ups=len(ups),
+                        obs_name_target=obs.name(target),
                     ),
-                    t(
-                        "security updates are available"
-                        + (" and fix a known exploited issue" if urgent else ""),
-                        "Sicherheitsupdates liegen vor"
-                        + (" und schließen eine aktiv ausgenutzte Lücke" if urgent else ""),
-                    ),
+                    tr("Security updates are available and fix a known exploited issue")
+                    if urgent
+                    else tr("Security updates are available"),
                     [Step(action="host.patch", params={"host": target, "security_only": True})],
                     urgent=urgent,
                     key=f"patch:{target}",
@@ -169,13 +163,10 @@ class Reconciler:
                     Proposal(
                         Category.BACKUP,
                         target,
-                        t(f"Back up {obs.name(target)}", f"{obs.name(target)} sichern"),
-                        t("no backup yet", "noch keine Sicherung")
+                        tr("Back up {obs_name_target}", obs_name_target=obs.name(target)),
+                        tr("no backup yet")
                         if last is None
-                        else t(
-                            f"last backup {last:%Y-%m-%d %H:%M}",
-                            f"letzte Sicherung {last:%d.%m.%Y %H:%M}",
-                        ),
+                        else tr("last backup {last:%Y-%m-%d %H:%M}", last=last),
                         [Step(action="backup.run", params={"target": target})],
                         key=f"backup:{target}",
                     )

@@ -16,19 +16,19 @@ export function Updates() {
   if (!data) return <Loading />;
   const groups: Record<string, Update[]> = {};
   data.updates.forEach((u) => (groups[u.target] ??= []).push(u));
-  const kind: Record<string, string> = { package: t("Pakete", "Packages"), firmware: "Firmware", opstend: "OpsTend", app: t("Anwendung", "Application") };
+  const kind: Record<string, string> = { package: t("Packages"), firmware: "Firmware", opstend: "OpsTend", app: t("Application") };
   return (
     <>
       <div className="page-head">
         <div>
           <h1>Updates</h1>
-          <p className="muted">{t("Sicherheitsupdates spielt OpsTend im Wartungsfenster selbst ein. Alles andere läuft als abgestimmter Rollout über alle Systeme.", "OpsTend installs security updates in the maintenance window. Everything else runs as one coordinated rollout across all systems.")}</p>
+          <p className="muted">{t("OpsTend installs security updates in the maintenance window. Everything else runs as one coordinated rollout across all systems.")}</p>
         </div>
-        <div className="small muted">{t("Nächstes Wartungsfenster", "Next maintenance window")}: <b>{new Date(data.next_window).toLocaleString(lang, { weekday: "long", hour: "2-digit", minute: "2-digit" })}</b></div>
+        <div className="small muted">{t("Next maintenance window")}: <b>{new Date(data.next_window).toLocaleString(lang, { weekday: "long", hour: "2-digit", minute: "2-digit" })}</b></div>
       </div>
       <div className="grid split">
-        <Card title={t("Verfügbar", "Available")} flush>
-          {data.updates.length === 0 && <Empty>{t("Alles aktuell.", "Everything is up to date.")}</Empty>}
+        <Card title={t("Available")} flush>
+          {data.updates.length === 0 && <Empty>{t("Everything is up to date.")}</Empty>}
           {Object.entries(groups).map(([target, ups]) => (
             <div key={target} className="item">
               <div className="row between"><b>{data.names[target] ?? target}</b><span className="muted small">{kind[ups[0].kind] ?? ups[0].kind}</span></div>
@@ -36,14 +36,14 @@ export function Updates() {
                 <div key={u.id} className="row small">
                   <span style={{ minWidth: 160 }}>{u.notes || u.id}</span>
                   <span className="mono muted">{u.current} → {u.available}</span>
-                  {u.security && <span className="pill bad plain">{t("Sicherheit", "Security")}</span>}
-                  {u.reboot && <span className="pill warn plain">{t("Neustart", "Reboot")}</span>}
+                  {u.security && <span className="pill bad plain">{t("Security")}</span>}
+                  {u.reboot && <span className="pill warn plain">{t("Reboot")}</span>}
                 </div>
               ))}
             </div>
           ))}
         </Card>
-        <Card title={t("Abgestimmter Rollout", "Coordinated rollout")} sub={t("Reihenfolge, die das Quorum hält und Endgeräte vor dem Kern aktualisiert", "Order that keeps quorum and updates edge devices before the core")}>
+        <Card title={t("Coordinated rollout")} sub={t("Order that keeps quorum and updates edge devices before the core")}>
           {data.plan_error && <div className="banner warn">{data.plan_error}</div>}
           <ol className="steps">
             {data.waves.map((w) => (
@@ -55,10 +55,10 @@ export function Updates() {
           </ol>
           {canAct && data.waves.length > 0 && (
             <button className="btn primary" style={{ marginTop: 12 }} onClick={() => flow.start(() => api.post<Job>("/api/rollouts", {}))}>
-              <Icon name="refresh" />{t("Rollout vorbereiten", "Prepare rollout")}
+              <Icon name="refresh" />{t("Prepare rollout")}
             </button>
           )}
-          <p className="muted small" style={{ marginTop: 12 }}>{t("Nach jeder Welle prüft OpsTend die Gesundheit. Schlägt eine Welle fehl, hält der Rollout an und das betroffene System geht auf den vorherigen Stand zurück.", "After each wave OpsTend checks health. If a wave fails, the rollout stops and the affected system returns to its previous state.")}</p>
+          <p className="muted small" style={{ marginTop: 12 }}>{t("After each wave OpsTend checks health. If a wave fails, the rollout stops and the affected system returns to its previous state.")}</p>
         </Card>
       </div>
       {flow.dialog}

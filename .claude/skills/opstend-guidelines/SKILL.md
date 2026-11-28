@@ -42,9 +42,16 @@ change has to keep three promises: **safe**, **understandable**, **self-managing
 - **One word per concept.** Use: *Auftrag/job*, *Entscheidung/decision*,
   *Störung/incident*, *Hinweis/insight*, *Befund/finding*, *Wartungsfenster/maintenance
   window*. Do not introduce synonyms (no "Vorgang", "Beleg", "Readback" in the UI).
-- **Never mix languages on one screen.** UI strings use `t("Deutsch", "English")`;
-  server texts use `opstend.i18n.t("English", "Deutsch")` (note the order). German is
-  the default.
+- **One language system.** English is the source language and the default for the API
+  and everything internal. Write every human-facing text once, in English, with named
+  placeholders: server `tr("Restart {service}", service=name)` (`opstend.i18n`), web
+  `t("Restart {service}", { service })` (`useT()`). Translations live only in
+  `src/opstend/locales/<lang>.json` (keyed by the English text); the web app loads the
+  same file from `/api/i18n/<lang>`. Plurals use separate keys chosen by count.
+  `tests/test_i18n.py` fails if a text is missing from a catalog or placeholders differ.
+  Stored texts (jobs, steps, findings) keep their template and are rendered in each
+  reader's language by the API (`i18n.localize`). Never build sentences by concatenating
+  translated fragments; translate the whole sentence.
 - **Say what happens.** Buttons name the action ("Freigeben und ausführen"), previews
   list each step in plain words, errors say what went wrong and what to do.
 - **Same actions everywhere.** A guest offers the same buttons on Proxmox, libvirt and

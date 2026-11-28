@@ -14,15 +14,15 @@ export function Jobs() {
   return (
     <>
       <div className="page-head">
-        <div><h1>{t("Aufträge und Protokoll", "Jobs and log")}</h1>
-          <p className="muted">{t("Jede Änderung ist ein Auftrag: Vorschau, Freigabe, Ausführung und Prüfung des Ergebnisses. Das Protokoll ist fälschungssicher verkettet.", "Every change is a job: preview, approval, execution and a check of the result. The log is tamper-evident.")}</p></div>
+        <div><h1>{t("Jobs and log")}</h1>
+          <p className="muted">{t("Every change is a job: preview, approval, execution and a check of the result. The log is tamper-evident.")}</p></div>
       </div>
-      <Tabs current={tab === "log" ? "/jobs?tab=log" : "/jobs"} items={[{ path: "/jobs", label: t("Aufträge", "Jobs"), count: jobs?.length }, { path: "/jobs?tab=log", label: t("Protokoll", "Log") }]} />
+      <Tabs current={tab === "log" ? "/jobs?tab=log" : "/jobs"} items={[{ path: "/jobs", label: t("Jobs"), count: jobs?.length }, { path: "/jobs?tab=log", label: t("Log") }]} />
       {tab === "log" ? (
         <Card flush>
           {!log ? <Loading /> : (
             <div className="table-wrap"><table>
-              <thead><tr><th>{t("Zeit", "Time")}</th><th>{t("Wer", "Who")}</th><th>{t("Was", "What")}</th><th>{t("Ziel", "Target")}</th><th>{t("Ergebnis", "Outcome")}</th></tr></thead>
+              <thead><tr><th>{t("Time")}</th><th>{t("Who")}</th><th>{t("What")}</th><th>{t("Target")}</th><th>{t("Outcome")}</th></tr></thead>
               <tbody>{log.map((e) => (
                 <tr key={e.seq} className={e.job_id ? "link" : ""} onClick={() => e.job_id && go(`/jobs/${e.job_id}`)}>
                   <td className="num small">{new Date(e.at).toLocaleString(lang)}</td><td>{e.actor}</td>
@@ -35,12 +35,12 @@ export function Jobs() {
         </Card>
       ) : (
         <Card flush>
-          {!jobs ? <Loading /> : jobs.length === 0 ? <Empty>{t("Noch keine Aufträge.", "No jobs yet.")}</Empty> : (
+          {!jobs ? <Loading /> : jobs.length === 0 ? <Empty>{t("No jobs yet.")}</Empty> : (
             <div className="table-wrap"><table>
-              <thead><tr><th>{t("Auftrag", "Job")}</th><th className="hide-sm">{t("Von", "By")}</th><th className="hide-sm">{t("Aktualisiert", "Updated")}</th><th>{t("Stand", "State")}</th></tr></thead>
+              <thead><tr><th>{t("Job")}</th><th className="hide-sm">{t("By")}</th><th className="hide-sm">{t("Updated")}</th><th>{t("State")}</th></tr></thead>
               <tbody>{jobs.map((j) => (
                 <tr key={j.id} className="link" onClick={() => go(`/jobs/${j.id}`)}>
-                  <td><b>{j.title}</b><span className="sub">{j.steps.length} {t("Schritte", "steps")} · {j.target}</span></td>
+                  <td><b>{j.title}</b><span className="sub">{j.steps.length} {t("steps")} · {j.target}</span></td>
                   <td className="hide-sm">{j.requested_by}</td><td className="hide-sm small">{when(j.updated_at, lang)}</td><td><Pill state={j.state} /></td>
                 </tr>
               ))}</tbody>
@@ -74,9 +74,9 @@ export function JobDetail({ id }: { id: string }) {
     <>
       <div className="page-head">
         <div>
-          <div className="eyebrow"><a href={href("/jobs")}>{t("Aufträge", "Jobs")}</a> · {j.target}</div>
+          <div className="eyebrow"><a href={href("/jobs")}>{t("Jobs")}</a> · {j.target}</div>
           <h1>{j.title}</h1>
-          <p className="muted">{t("Angefordert von", "Requested by")} {j.requested_by} · {when(j.created_at, lang)}{j.approved_by ? ` · ${t("freigegeben von", "approved by")} ${j.approved_by}` : ""}</p>
+          <p className="muted">{t("Requested by")} {j.requested_by} · {when(j.created_at, lang)}{j.approved_by ? ` · ${t("approved by")} ${j.approved_by}` : ""}</p>
         </div>
         <Pill state={j.state} />
       </div>
@@ -85,16 +85,16 @@ export function JobDetail({ id }: { id: string }) {
       {j.state === "awaiting_approval" && canAct && (
         <Card>
           <div className="row between">
-            <span>{t("Prüfe die Schritte. Nach der Freigabe führt OpsTend sie aus und liest das Ergebnis zurück.", "Review the steps. After approval OpsTend runs them and reads the result back.")}</span>
+            <span>{t("Review the steps. After approval OpsTend runs them and reads the result back.")}</span>
             <div className="row">
-              <button className="btn" onClick={() => act("reject")}>{t("Ablehnen", "Reject")}</button>
-              <button className="btn primary" onClick={() => act("approve")}><Icon name="check" />{t("Freigeben", "Approve")}</button>
+              <button className="btn" onClick={() => act("reject")}>{t("Reject")}</button>
+              <button className="btn primary" onClick={() => act("approve")}><Icon name="check" />{t("Approve")}</button>
             </div>
           </div>
         </Card>
       )}
       <div className="grid split">
-        <Card title={t("Schritte", "Steps")}>
+        <Card title={t("Steps")}>
           <ol className="steps">
             {j.steps.map((s, i) => (
               <li key={i}>
@@ -108,9 +108,9 @@ export function JobDetail({ id }: { id: string }) {
               </li>
             ))}
           </ol>
-          {j.reason && <p className="small muted" style={{ marginTop: 12 }}>{t("Anlass", "Reason")}: {j.reason}</p>}
+          {j.reason && <p className="small muted" style={{ marginTop: 12 }}>{t("Reason")}: {j.reason}</p>}
         </Card>
-        <Card title={t("Verlauf", "History")} flush>
+        <Card title={t("History")} flush>
           {data.events.length === 0 && <Empty>–</Empty>}
           {data.events.map((e) => (
             <div key={e.seq} className="item small">
@@ -118,7 +118,7 @@ export function JobDetail({ id }: { id: string }) {
               <span className="muted">{e.actor}{e.outcome !== "ok" ? ` · ${e.outcome}` : ""}</span>
             </div>
           ))}
-          <div className="item small muted">{t("Vorschau-Fingerabdruck", "Preview fingerprint")}: <span className="mono">{j.fingerprint}</span></div>
+          <div className="item small muted">{t("Preview fingerprint")}: <span className="mono">{j.fingerprint}</span></div>
         </Card>
       </div>
     </>

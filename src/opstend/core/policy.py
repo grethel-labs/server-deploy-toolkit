@@ -14,7 +14,7 @@ from pydantic import Field
 
 from opstend.core.models import Model
 from opstend.core.windows import Window
-from opstend.i18n import t
+from opstend.i18n import tr
 
 
 class Autonomy(StrEnum):
@@ -97,17 +97,17 @@ class Governor:
         if level is Autonomy.OBSERVE:
             return Decision(
                 verdict=Verdict.RECORD_ONLY,
-                reason=t("Policy: report only.", "Richtlinie: nur melden."),
+                reason=tr("Policy: report only."),
             )
         if level is Autonomy.PROPOSE:
             return Decision(
                 verdict=Verdict.WAIT_APPROVAL,
-                reason=t("Policy: needs approval.", "Richtlinie: braucht Freigabe."),
+                reason=tr("Policy: needs approval."),
             )
         if self.policy.kill_switch:
             return Decision(
                 verdict=Verdict.WAIT_APPROVAL,
-                reason=t("The kill switch is on.", "Der Not-Aus ist aktiv."),
+                reason=tr("The kill switch is on."),
             )
         key = f"{category}:{target}"
         history = self._history[key]
@@ -117,28 +117,20 @@ class Governor:
         if history and now - history[-1] < timedelta(minutes=budget.cooldown_minutes):
             return Decision(
                 verdict=Verdict.BLOCKED,
-                reason=t("Cooldown active; needs you.", "Pause aktiv; braucht dich."),
+                reason=tr("Cooldown active; needs you."),
             )
         if len(history) >= budget.max_actions:
             return Decision(
                 verdict=Verdict.BLOCKED,
-                reason=t(
-                    "Retry budget used up; needs you.",
-                    "Wiederholungsbudget aufgebraucht; braucht dich.",
-                ),
+                reason=tr("Retry budget used up; needs you."),
             )
         if category in DISRUPTIVE and not urgent and not self.policy.window.is_open(now):
             start, _ = self.policy.window.next_open(now)
             return Decision(
                 verdict=Verdict.WAIT_WINDOW,
-                reason=t(
-                    f"Waits for the window on {start:%a %H:%M}.",
-                    f"Wartet auf das Fenster am {start:%d.%m. %H:%M}.",
-                ),
+                reason=tr("Waits for the window on {start:%a %H:%M}.", start=start),
             )
-        return Decision(
-            verdict=Verdict.RUN, reason=t("Within policy.", "Im Rahmen der Richtlinie.")
-        )
+        return Decision(verdict=Verdict.RUN, reason=tr("Within policy."))
 
     def spend(self, category: Category, target: str, now: datetime | None = None) -> None:
         self._history[f"{category}:{target}"].append(now or datetime.now(UTC))

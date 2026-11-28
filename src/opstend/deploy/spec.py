@@ -13,7 +13,7 @@ from enum import StrEnum
 from pydantic import Field, field_validator
 
 from opstend.core.models import Model
-from opstend.i18n import t
+from opstend.i18n import tr
 
 
 class Exposure(StrEnum):
@@ -113,10 +113,7 @@ def validate(spec: WorkloadSpec, *, allow_public: bool = False) -> list[Violatio
                 Violation(
                     service=s.name,
                     rule="source",
-                    message=t(
-                        "needs an image or a build context",
-                        "braucht ein Image oder einen Build-Kontext",
-                    ),
+                    message=tr("needs an image or a build context"),
                 )
             )
         if s.image and (":" not in s.image.rsplit("/", 1)[-1] and "@sha256:" not in s.image):
@@ -125,10 +122,7 @@ def validate(spec: WorkloadSpec, *, allow_public: bool = False) -> list[Violatio
                     service=s.name,
                     rule="pinned-image",
                     blocking=False,
-                    message=t(
-                        "image has no tag; OpsTend pins it to a digest on deploy",
-                        "Image ohne Tag; OpsTend fixiert beim Deploy den Digest",
-                    ),
+                    message=tr("image has no tag; OpsTend pins it to a digest on deploy"),
                 )
             )
         if s.image and s.image.endswith(":latest"):
@@ -137,10 +131,7 @@ def validate(spec: WorkloadSpec, *, allow_public: bool = False) -> list[Violatio
                     service=s.name,
                     rule="pinned-image",
                     blocking=False,
-                    message=t(
-                        "'latest' changes silently; OpsTend pins the digest",
-                        "'latest' ändert sich unbemerkt; OpsTend fixiert den Digest",
-                    ),
+                    message=tr("'latest' changes silently; OpsTend pins the digest"),
                 )
             )
         for v in s.volumes:
@@ -149,10 +140,7 @@ def validate(spec: WorkloadSpec, *, allow_public: bool = False) -> list[Violatio
                     Violation(
                         service=s.name,
                         rule="volume-path",
-                        message=t(
-                            f"volume path {v.path} is not allowed",
-                            f"Pfad {v.path} ist für Daten nicht erlaubt",
-                        ),
+                        message=tr("volume path {v_path} is not allowed", v_path=v.path),
                     )
                 )
             if not re.fullmatch(r"[a-z0-9][a-z0-9_.-]{0,62}", v.name):
@@ -160,10 +148,7 @@ def validate(spec: WorkloadSpec, *, allow_public: bool = False) -> list[Violatio
                     Violation(
                         service=s.name,
                         rule="volume-name",
-                        message=t(
-                            f"volume name {v.name!r} must be a plain name",
-                            f"Datenname {v.name!r} muss ein einfacher Name sein",
-                        ),
+                        message=tr("volume name {v_name!r} must be a plain name", v_name=v.name),
                     )
                 )
         for p in s.ports:
@@ -172,7 +157,7 @@ def validate(spec: WorkloadSpec, *, allow_public: bool = False) -> list[Violatio
                     Violation(
                         service=s.name,
                         rule="port",
-                        message=t(f"invalid port {p.container}", f"ungültiger Port {p.container}"),
+                        message=tr("invalid port {container}", container=p.container),
                     )
                 )
             if p.exposure == Exposure.PUBLIC:
@@ -181,10 +166,7 @@ def validate(spec: WorkloadSpec, *, allow_public: bool = False) -> list[Violatio
                         Violation(
                             service=s.name,
                             rule="public-hostname",
-                            message=t(
-                                "public ports need a hostname for HTTPS",
-                                "öffentliche Ports brauchen einen Hostnamen für HTTPS",
-                            ),
+                            message=tr("public ports need a hostname for HTTPS"),
                         )
                     )
                 if not allow_public:
@@ -193,10 +175,7 @@ def validate(spec: WorkloadSpec, *, allow_public: bool = False) -> list[Violatio
                             service=s.name,
                             rule="public-approval",
                             blocking=False,
-                            message=t(
-                                "public exposure needs operator approval",
-                                "öffentliche Erreichbarkeit braucht eine Freigabe",
-                            ),
+                            message=tr("public exposure needs operator approval"),
                         )
                     )
         if not 0.05 <= s.cpus <= 64:
@@ -204,7 +183,7 @@ def validate(spec: WorkloadSpec, *, allow_public: bool = False) -> list[Violatio
                 Violation(
                     service=s.name,
                     rule="limits",
-                    message=t("cpus must be 0.05–64", "CPU muss zwischen 0,05 und 64 liegen"),
+                    message=tr("cpus must be 0.05–64"),
                 )
             )
         if not 32 <= s.memory_mb <= 262144:
@@ -212,10 +191,7 @@ def validate(spec: WorkloadSpec, *, allow_public: bool = False) -> list[Violatio
                 Violation(
                     service=s.name,
                     rule="limits",
-                    message=t(
-                        "memory must be 32 MB–256 GB",
-                        "Speicher muss zwischen 32 MB und 256 GB liegen",
-                    ),
+                    message=tr("memory must be 32 MB–256 GB"),
                 )
             )
         if s.user in ("root", "0", "0:0"):
@@ -224,9 +200,8 @@ def validate(spec: WorkloadSpec, *, allow_public: bool = False) -> list[Violatio
                     service=s.name,
                     rule="non-root",
                     blocking=False,
-                    message=t(
-                        "runs as root inside the container; it still has no host privileges (rootless, user namespace)",
-                        "läuft im Container als root; auf dem Host ohne Rechte (rootless, User-Namespace)",
+                    message=tr(
+                        "runs as root inside the container; it still has no host privileges (rootless, user namespace)"
                     ),
                 )
             )
@@ -236,10 +211,7 @@ def validate(spec: WorkloadSpec, *, allow_public: bool = False) -> list[Violatio
                     Violation(
                         service=s.name,
                         rule="depends-on",
-                        message=t(
-                            f"depends on unknown service {dep}",
-                            f"hängt vom unbekannten Dienst {dep} ab",
-                        ),
+                        message=tr("depends on unknown service {dep}", dep=dep),
                     )
                 )
         for e in s.env:
@@ -248,7 +220,7 @@ def validate(spec: WorkloadSpec, *, allow_public: bool = False) -> list[Violatio
                     Violation(
                         service=s.name,
                         rule="env",
-                        message=t(f"bad variable {e.name}", f"ungültige Variable {e.name}"),
+                        message=tr("bad variable {e_name}", e_name=e.name),
                     )
                 )
             if e.secret and e.value:
@@ -256,9 +228,8 @@ def validate(spec: WorkloadSpec, *, allow_public: bool = False) -> list[Violatio
                     Violation(
                         service=s.name,
                         rule="secret-inline",
-                        message=t(
-                            f"{e.name} is a secret and must not carry a value",
-                            f"{e.name} ist ein Geheimnis und darf keinen Wert enthalten",
+                        message=tr(
+                            "{e_name} is a secret and must not carry a value", e_name=e.name
                         ),
                     )
                 )

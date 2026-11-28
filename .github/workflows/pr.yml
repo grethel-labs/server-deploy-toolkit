@@ -28,13 +28,3 @@ jobs:
             build
             ci
             chore
-
-  dependencies:
-    if: github.event.pull_request.head.repo.full_name == github.repository
-    runs-on: ubuntu-24.04
-    permissions:
-      contents: read
-    steps:
-      - uses: actions/dependency-review-action@bbc44d14a204704ccc493733616cd1e93a0321ec # v5.0.1
-        with:
-          fail-on-severity: high
