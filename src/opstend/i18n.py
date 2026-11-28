@@ -26,18 +26,22 @@ current: ContextVar[str] = ContextVar("opstend_lang", default=DEFAULT)
 
 
 @cache
+def _files() -> dict[str, Path]:
+    """Catalog files by language code; only these names are ever opened."""
+    return {p.stem: p for p in LOCALES.glob("*.json") if p.stem != DEFAULT}
+
+
+@cache
 def catalog(lang: str) -> dict[str, str]:
-    if lang == DEFAULT:
-        return {}
-    path = LOCALES / f"{lang}.json"
-    if not path.is_file():
+    path = _files().get(lang)
+    if path is None:
         return {}
     data: dict[str, str] = json.loads(path.read_text(encoding="utf-8"))
     return data
 
 
 def languages() -> list[str]:
-    return [DEFAULT, *sorted(p.stem for p in LOCALES.glob("*.json") if p.stem != DEFAULT)]
+    return [DEFAULT, *sorted(_files())]
 
 
 class I18nStr(str):
