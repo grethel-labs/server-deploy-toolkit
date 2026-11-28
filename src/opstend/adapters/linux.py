@@ -348,6 +348,13 @@ class Linux:
                 tags=[f"arch={f.arch}", f"pkg={f.manager}", f"init={f.init}"],
             )
         )
+        udev = await self.runner.run(["udevadm", "info", "--export-db"], check=False)
+        if udev.code == 0:
+            from opstend.workloads.plan import parse_udev
+
+            inv.hosts[-1].devices = parse_udev(udev.stdout)
+        if f.podman:
+            inv.hosts[-1].tags.append("podman")
         inv.bridges += await self._bridges()
         if f.podman:
             inv.guests += parse_podman_ps(

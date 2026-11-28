@@ -1,0 +1,24 @@
+id: home-assistant
+name: Home Assistant
+version: "1.0.0"
+description: Home automation for lights, sensors and devices.
+category: iot
+homepage: https://www.home-assistant.io
+services:
+  - name: core
+    image: ghcr.io/home-assistant/home-assistant:2025.11
+    ports: [{container: 8123, exposure: lan}]
+    volumes: [{name: config, path: /config, backup: true}]
+    health: {kind: http, path: /, port: 8123}
+    memory_mb: 1024
+    read_only: false
+resources: {cpus: 1, memory_mb: 1024, storage_gb: 5}
+devices:
+  - {kind: usb, selector: "", optional: true, reason: Zigbee or Z-Wave stick}
+network:
+  egress: internet
+tests:
+  - {name: Onboarding page answers, service: core, port: 8123, path: /, expect_status: [200, 302]}
+backup_paths: [/config]
+notes:
+  - Device discovery by broadcast does not cross the isolated network; add devices by address.

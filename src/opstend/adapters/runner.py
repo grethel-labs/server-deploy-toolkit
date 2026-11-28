@@ -59,6 +59,8 @@ ALLOWED = {
     "ss",
     # network
     "wg",
+    "udevadm",
+    "nvidia-smi",
     "bridge",
     "ethtool",
     "lldpctl",

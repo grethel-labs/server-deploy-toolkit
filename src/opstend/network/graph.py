@@ -27,6 +27,7 @@ from opstend.core.models import (
     RuleAction,
     Tunnel,
 )
+from opstend.i18n import tr
 
 
 @dataclass
@@ -344,9 +345,9 @@ def firewall_decision(
     g: NetworkGraph, src: Network | None, dst: Network | None, port: int | None = None
 ) -> tuple[bool, str]:
     if src is None or dst is None:
-        return True, "unknown network; no rule applied"
+        return True, tr("unknown network; no rule applied")
     if src.id == dst.id:
-        return True, "same network"
+        return True, tr("same network")
     for rule in sorted(g.firewall, key=lambda r: r.order):
         if not rule.enabled:
             continue
@@ -355,10 +356,14 @@ def firewall_decision(
         if rule.ports and port is not None and str(port) not in rule.ports.split(","):
             continue
         allowed = RuleAction(rule.action) == RuleAction.ALLOW
-        return allowed, f"rule '{rule.name}' ({rule.action})"
+        return allowed, tr("rule '{name}' ({action})", name=rule.name, action=rule.action)
     if src.isolated or dst.isolated:
-        return False, f"network isolation of {'source' if src.isolated else 'target'} network"
-    return True, "default: routed between internal networks"
+        return False, (
+            tr("the source network is isolated")
+            if src.isolated
+            else tr("the target network is isolated")
+        )
+    return True, tr("default: routed between internal networks")
 
 
 @dataclass
@@ -387,30 +392,46 @@ def explain(g: NetworkGraph, src: str, dst: str, port: int | None = None) -> Pat
         return None, None
 
     if src not in g.vertices or dst not in g.vertices:
-        return PathExplanation(False, [], ["unknown source or target"])
+        return PathExplanation(False, [], [tr("unknown source or target")])
     svlan, snet = vlan_and_net(src)
     dvlan, dnet = vlan_and_net(dst)
     steps: list[str] = []
     if (svlan or 1) == (dvlan or 1):
         path = l2_path(g, src, dst, svlan)
         if path:
-            steps.append(f"same VLAN {svlan or 1}: switched directly")
+            steps.append(tr("same VLAN {vlan}: switched directly", vlan=svlan or 1))
             return PathExplanation(True, path, steps)
-        return PathExplanation(False, [], [f"no link carries VLAN {svlan or 1} between them"])
+        return PathExplanation(
+            False, [], [tr("no link carries VLAN {vlan} between them", vlan=svlan or 1)]
+        )
     gw = next((v.id for v in g.vertices.values() if v.kind == "gateway"), None)
     if gw is None:
-        return PathExplanation(False, [], ["different VLANs and no gateway known"])
+        return PathExplanation(False, [], [tr("different VLANs and no gateway known")])
     first = l2_path(g, src, gw, svlan)
     if not first:
-        return PathExplanation(False, [], [f"source cannot reach the gateway in VLAN {svlan or 1}"])
-    steps.append(f"VLAN {svlan or 1} ({snet.name if snet else '?'}) to the gateway")
+        return PathExplanation(
+            False, [], [tr("source cannot reach the gateway in VLAN {vlan}", vlan=svlan or 1)]
+        )
+    steps.append(
+        tr(
+            "VLAN {vlan} ({network}) to the gateway",
+            vlan=svlan or 1,
+            network=snet.name if snet else "?",
+        )
+    )
     allowed, why = firewall_decision(g, snet, dnet, port)
-    steps.append(f"gateway: {why}")
+    steps.append(tr("gateway: {why}", why=why))
     if not allowed:
         return PathExplanation(False, first, steps)
     second = l2_path(g, gw, dst, dvlan)
     if not second:
-        steps.append(f"no link carries VLAN {dvlan or 1} to the target")
+        steps.append(tr("no link carries VLAN {vlan} to the target", vlan=dvlan or 1))
         return PathExplanation(False, first, steps)
-    steps.append(f"VLAN {dvlan or 1} ({dnet.name if dnet else '?'}) to the target")
+    steps.append(
+        tr(
+            "VLAN {vlan} ({network}) to the target",
+            vlan=dvlan or 1,
+            network=dnet.name if dnet else "?",
+        )
+    )
     return PathExplanation(True, first + second[1:], steps)

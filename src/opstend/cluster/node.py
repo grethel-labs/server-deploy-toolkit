@@ -117,6 +117,10 @@ class Identity:
         self._write("ca.crt", ca_pem)
         self._write("node.key", key_pem(key), secret=True)
         self._write("node.crt", data["cert"].encode())
+        if data.get("data_key"):
+            from opstend.secrets import DataKey, open_sealed
+
+            DataKey(open_sealed(key, data["data_key"])).save(self.path("data.key"))
         return data
 
 
@@ -210,7 +214,25 @@ def web_routes(app: FastAPI, rt: Runtime) -> None:
         peers[node_id] = f"https://{info.get('address')}:{info.get('cluster_port', 47471)}"
         await rt.write({"op": "meta", "key": "peers", "value": json.dumps(peers)})
         rt.audit.record("cluster", "node.join", f"node/{node_id}")
-        return {"cert": cert.decode(), "peers": peers, "voters": rt.raft.voters, "node_id": node_id}
+        from cryptography import x509
+        from cryptography.hazmat.primitives import serialization
+
+        from opstend.secrets import seal_for
+
+        node_key = (
+            x509.load_pem_x509_certificate(cert)
+            .public_key()
+            .public_bytes(
+                serialization.Encoding.PEM, serialization.PublicFormat.SubjectPublicKeyInfo
+            )
+        )
+        return {
+            "cert": cert.decode(),
+            "peers": peers,
+            "voters": rt.raft.voters,
+            "node_id": node_id,
+            "data_key": seal_for(node_key, rt.data_key.key),
+        }
 
 
 def _proof_ok(body: JoinRequest, token: dict[str, Any]) -> bool:

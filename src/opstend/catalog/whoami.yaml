@@ -1,0 +1,19 @@
+id: whoami
+name: Whoami test service
+version: "1.0.0"
+description: Tiny web service that shows request details. Useful to test networks and publishing.
+category: tools
+homepage: https://github.com/traefik/whoami
+services:
+  - name: web
+    image: docker.io/traefik/whoami:v1.11
+    ports: [{container: 80, exposure: lan}]
+    health: {kind: http, path: /, port: 80}
+    memory_mb: 32
+    cpus: 0.1
+    read_only: true
+resources: {cpus: 0.1, memory_mb: 32, storage_gb: 1}
+network: {egress: none}
+tests:
+  - {name: Answers with request details, service: web, port: 80, path: /, expect_status: [200], expect_text: Hostname}
+architectures: [amd64, arm64, armv7, ppc64le, s390x, riscv64, "386"]

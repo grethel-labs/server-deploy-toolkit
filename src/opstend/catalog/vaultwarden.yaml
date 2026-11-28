@@ -1,0 +1,23 @@
+id: vaultwarden
+name: Vaultwarden
+version: "1.0.0"
+description: Password manager compatible with Bitwarden apps.
+category: security
+homepage: https://github.com/dani-garcia/vaultwarden
+services:
+  - name: app
+    image: docker.io/vaultwarden/server:1.34.3
+    ports: [{container: 80, exposure: lan}]
+    volumes: [{name: data, path: /data, backup: true}]
+    health: {kind: http, path: /alive, port: 80}
+    memory_mb: 256
+    read_only: false
+settings:
+  - {name: admin_token, label: Admin page password, type: secret, env: ADMIN_TOKEN, required: true, help: Protects the admin page.}
+  - {name: signups, label: Allow new sign-ups, type: boolean, default: false, env: SIGNUPS_ALLOWED}
+  - {name: domain, label: Public address (https://…), type: string, env: DOMAIN, help: Needed for attachments and WebAuthn.}
+resources: {cpus: 0.5, memory_mb: 256, storage_gb: 2}
+network: {egress: none}
+tests:
+  - {name: Server is alive, service: app, port: 80, path: /alive, expect_status: [200]}
+backup_paths: [/data]

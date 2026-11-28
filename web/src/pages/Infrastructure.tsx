@@ -35,7 +35,7 @@ export function Infrastructure() {
               <thead><tr><th>Host</th><th>{t("Platform")}</th><th className="hide-sm">CPU</th><th className="hide-sm">{t("Memory")}</th><th>{t("Guests")}</th><th>Updates</th><th>{t("State")}</th></tr></thead>
               <tbody>
                 {shownHosts.map((h) => (
-                  <tr key={h.id} className="link" onClick={() => go(`/hosts/${encodeURIComponent(h.id)}`)}>
+                  <tr key={h.id} className="link" data-zorec={`host-${h.id}`} onClick={() => go(`/hosts/${encodeURIComponent(h.id)}`)}>
                     <td><b>{h.name}</b><span className="sub">{h.address} · {h.site}</span></td>
                     <td>{h.platform === "proxmox" ? "Proxmox VE" : "Linux"}<span className="sub">{h.os}</span></td>
                     <td className="hide-sm" style={{ minWidth: 120 }}><span className="num">{pct(h.usage.cpu_pct)}</span><Meter value={h.usage.cpu_pct} max={100} /></td>

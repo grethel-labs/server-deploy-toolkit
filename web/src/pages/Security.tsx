@@ -25,7 +25,7 @@ export function Security() {
       <Card title={t("Findings by urgency")} flush>
         {f.length === 0 && <Empty>{t("No open findings.")}</Empty>}
         {f.map((x) => (
-          <div key={x.id} className={`item sev-stripe ${x.severity}`}>
+          <div key={x.id} className={`item sev-stripe ${x.severity}`} data-zorec={`finding-${x.id}`}>
             <div className="row between">
               <span className="title">{x.title}</span>
               <div className="row">

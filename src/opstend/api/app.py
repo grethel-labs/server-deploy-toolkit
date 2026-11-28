@@ -18,6 +18,8 @@ from pydantic import BaseModel, Field
 
 from opstend import __version__, i18n
 from opstend.adapters.base import Capability
+from opstend.api import workloads as workloads_api
+from opstend.api import zorec_api
 from opstend.api.auth import RANK, Role, Session, Sessions, check_password, hash_password
 from opstend.cluster import rollout
 from opstend.cluster.consensus import NotLeader
@@ -926,6 +928,14 @@ def build_app(rt: Runtime) -> FastAPI:
         return dump(job)
 
     web_routes(app, rt)
+
+    async def repo_files(url: str) -> tuple[dict[str, str], str | None]:
+        if url.rstrip("/") in DEMO_REPOS:
+            return DEMO_REPOS[url.rstrip("/")], "demo"
+        return await fetch_repo(url)
+
+    workloads_api.routes(app, rt, viewer, operator, admin, dump, repo_files)
+    zorec_api.routes(app, rt, viewer, admin, dump)
 
     # -- web app -----------------------------------------------------------
 

@@ -43,6 +43,12 @@ POWER: dict[str, Callable[[str], str]] = {
 
 def descriptions(store: Store) -> dict[str, tuple[str, Callable[[dict[str, Any]], str]]]:
     n = lambda kind, key: lambda p: _name(store, kind, p.get(key))  # noqa: E731
+    w = n("workload", "workload")
+
+    def wh(p: dict[str, Any]) -> str:
+        doc = store.get("workload", p["workload"]) or {}
+        return _name(store, "host", p.get("host") or doc.get("host_id"))
+
     g, h, d, s = (
         n("guest", "guest"),
         n("host", "host"),
@@ -167,6 +173,38 @@ def descriptions(store: Store) -> dict[str, tuple[str, Callable[[dict[str, Any]]
                 name_store_node_p_node=_name(store, "node", p["node"]),
             ),
         ),
+        "workload.deploy": (
+            Category.DEPLOY,
+            lambda p: (
+                tr("Test {workload} in a sandbox on {host}", workload=w(p), host=wh(p))
+                if (store.get("workload", p["workload"]) or {}).get("environment") == "sandbox"
+                else tr("Deploy {workload} on {host}", workload=w(p), host=wh(p))
+            ),
+        ),
+        "workload.power": (
+            Category.POWER,
+            lambda p: {
+                "start": tr("Start {workload}", workload=w(p)),
+                "stop": tr("Stop {workload}", workload=w(p)),
+                "restart": tr("Restart {workload}", workload=w(p)),
+            }[p["action"]],
+        ),
+        "workload.test": (
+            Category.DEPLOY,
+            lambda p: tr("Run the checks of {workload}", workload=w(p)),
+        ),
+        "workload.remove": (
+            Category.DEPLOY,
+            lambda p: (
+                tr("Remove {workload} and delete its data", workload=w(p))
+                if p.get("purge")
+                else tr("Remove {workload}; keep its data", workload=w(p))
+            ),
+        ),
+        "workload.promote": (
+            Category.DEPLOY,
+            lambda p: tr("Take {workload} from the sandbox into operation", workload=w(p)),
+        ),
         "opstend.self_update": (
             Category.UPGRADE,
             lambda p: tr(
@@ -183,6 +221,11 @@ def descriptions(store: Store) -> dict[str, tuple[str, Callable[[dict[str, Any]]
 
 
 FACTS: dict[str, Callable[[dict[str, Any], Store], Any]] = {
+    "workload.deploy": lambda p, s: {
+        k: v
+        for k, v in (s.get("workload", p["workload"]) or {}).items()
+        if k not in ("state", "message", "tests", "i18n")
+    },
     "guest.power": lambda p, s: (s.get("guest", p["guest"]) or {}).get("state"),
     "guest.snapshot_rollback": lambda p, s: [
         x["name"] for x in (s.get("guest", p["guest"]) or {}).get("snapshots", [])
@@ -338,6 +381,8 @@ class DemoBackend:
                 if u["target"] == p["device"]:
                     s.delete("update", u["id"])
             return {}
+        if action.startswith("workload."):
+            return await self._workload(action, p)
         if action == "opstend.self_update":
             await self._wait(2)
             node = s.get("node", p["node"]) or {}
@@ -388,6 +433,56 @@ class DemoBackend:
             return {}
         return {}
 
+    async def _workload(self, action: str, p: dict[str, Any]) -> dict[str, Any]:
+        s = self.store
+        doc = s.get("workload", p["workload"])
+        if doc is None:
+            raise RuntimeError(f"workload {p['workload']} not found")
+        if action == "workload.deploy":
+            doc.update(state="deploying", host_id=p.get("host") or doc.get("host_id"))
+            s.put("workload", doc["id"], doc)
+            await self._wait(3)
+            for svc in doc["services"]:
+                gid = f"{doc['host_id']}:podman:{doc['id']}-{svc['name']}"
+                s.put(
+                    "guest",
+                    gid,
+                    Guest(
+                        id=gid,
+                        host_id=doc["host_id"],
+                        kind=GuestKind.CONTAINER,
+                        native_id=f"{doc['id']}-{svc['name']}",
+                        name=f"{doc['id']}-{svc['name']}",
+                        state=GuestState.RUNNING,
+                        image=svc.get("image"),
+                        tags=[f"opstend.workload={doc['id']}"],
+                    ),
+                )
+            doc["tests"] = [{**t, "ok": True, "detail": "200"} for t in doc.get("tests", [])]
+            doc["state"] = "testing" if doc.get("environment") == "sandbox" else "running"
+            s.put("workload", doc["id"], doc)
+            return {}
+        if action == "workload.power":
+            doc["state"] = "stopped" if p["action"] == "stop" else "running"
+            s.put("workload", doc["id"], doc)
+            for g in s.list("guest"):
+                if f"opstend.workload={doc['id']}" in g.get("tags", []):
+                    g["state"] = "stopped" if p["action"] == "stop" else "running"
+                    s.put("guest", g["id"], g)
+            return {}
+        if action == "workload.test":
+            await self._wait(2)
+            doc["tests"] = [{**t, "ok": True, "detail": "200"} for t in doc.get("tests", [])]
+            s.put("workload", doc["id"], doc)
+            return {}
+        if action == "workload.remove":
+            for g in s.list("guest"):
+                if f"opstend.workload={doc['id']}" in g.get("tags", []):
+                    s.delete("guest", g["id"])
+            doc["state"] = "removed"
+            s.put("workload", doc["id"], doc)
+        return {}
+
     async def verify(self, action: str, p: dict[str, Any], result: dict[str, Any]) -> bool:
         if action == "guest.power":
             want = {
@@ -436,6 +531,8 @@ class LiveBackend:
         self.unifi = unifi  # site -> Unifi adapter
         self.linux = linux  # host id -> Linux adapter (also Proxmox hosts via SSH)
         self.node_update: Any = None  # set by the runtime: (node id, version) -> result
+        self.write: Any = None  # set by the runtime: replicated write
+        self.vault: Any = None  # set by the runtime: secret store
 
     def _guest(self, gid: str) -> tuple[Guest, Compute]:
         doc = self.store.get("guest", gid)
@@ -474,6 +571,8 @@ class LiveBackend:
             guest, adapter = self._guest(p["guest"])
             await adapter.migrate(guest, p["host"].rsplit(":", 1)[-1])
             return {"before": guest.host_id}
+        if action.startswith("workload."):
+            return await self._workload(action, p)
         if action == "opstend.self_update":
             if self.node_update is None:
                 raise RuntimeError("cluster transport is not ready")
@@ -520,6 +619,60 @@ class LiveBackend:
                 )
             return {}
         raise RuntimeError(tr("{action} is not available on live systems yet", action=action))
+
+    async def _save_workload(self, doc: dict[str, Any]) -> None:
+        await self.write({"op": "put", "kind": "workload", "id": doc["id"], "data": doc})
+
+    async def _workload(self, action: str, p: dict[str, Any]) -> dict[str, Any]:
+        from opstend.core.models import Host
+        from opstend.workloads import manager
+        from opstend.workloads.models import Workload
+        from opstend.workloads.plan import match_devices, podman_plan
+
+        doc = self.store.get("workload", p["workload"])
+        if doc is None:
+            raise RuntimeError(f"workload {p['workload']} not found")
+        wl = Workload.model_validate(doc)
+        host_id = p.get("host") or wl.host_id
+        if not host_id or host_id not in self.linux:
+            raise RuntimeError(tr("No managed Linux host for this workload"))
+        runner = self.linux[host_id].runner
+        if action == "workload.deploy":
+            host = Host.model_validate(self.store.get("host", host_id))
+            devices, missing = match_devices(wl.devices, host.devices, wl.id)
+            if missing:
+                raise RuntimeError("; ".join(missing))
+            peers = {x["id"]: Workload.model_validate(x) for x in self.store.list("workload")}
+            doc.update(state="deploying", host_id=host_id)
+            await self._save_workload(doc)
+            try:
+                plan = podman_plan(wl, host.address, devices, peers)
+                await manager.execute(plan, runner, self.vault)
+                doc["tests"] = await manager.smoke_tests(wl, runner)
+            except Exception as exc:
+                doc.update(state="failed", message=str(exc)[:500])
+                await self._save_workload(doc)
+                raise
+            failed = [t for t in doc["tests"] if not t["ok"]]
+            if failed:
+                doc["state"] = "failed"
+            else:
+                doc["state"] = "testing" if wl.environment == "sandbox" else "running"
+            await self._save_workload(doc)
+            if failed:
+                raise RuntimeError(tr("{count} check(s) failed", count=len(failed)))
+            return {}
+        names = [wl.container(s.name) for s in wl.services]
+        if action == "workload.power":
+            await runner.run(["podman", p["action"], *names], timeout=300)
+            doc["state"] = "stopped" if p["action"] == "stop" else "running"
+        elif action == "workload.test":
+            doc["tests"] = await manager.smoke_tests(wl, runner)
+        elif action == "workload.remove":
+            await manager.remove(wl, runner, bool(p.get("purge")))
+            doc["state"] = "removed"
+        await self._save_workload(doc)
+        return {}
 
     async def verify(self, action: str, p: dict[str, Any], result: dict[str, Any]) -> bool:
         if action == "guest.power":

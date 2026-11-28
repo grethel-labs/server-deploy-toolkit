@@ -31,11 +31,16 @@ from opstend.core.models import Node, NodeState, Resources, Usage
 from opstend.core.policy import Governor, Policy
 from opstend.core.store import Store
 from opstend.integrations import Integrations
+from opstend.secrets import DataKey, Vault
 from opstend.selfmanage.health import ProbeResult
 from opstend.selfmanage.reconciler import Incident, Observations, Reconciler
 from opstend.state import Fleet
+from opstend.workloads.catalog import Adapter, load_builtin
+from opstend.zorec import selection
 from opstend.zorec.assistant import Zorec
-from opstend.zorec.providers import Provider, ProviderError, from_settings
+from opstend.zorec.providers import Kind, Provider, ProviderConfig, ProviderError
+from opstend.zorec.providers import build as build_provider
+from opstend.zorec.settings import AISettings, Capability
 
 log = logging.getLogger("opstend")
 
@@ -76,6 +81,11 @@ class Runtime:
             data.mkdir(parents=True, exist_ok=True)
         self.store = Store(":memory:" if demo else data / "state.db")
         self.identity: Identity | None = None if demo else Identity(data)
+        self.data_key = (
+            DataKey.generate() if demo else DataKey.load_or_create(data / "cluster" / "data.key")
+        )
+        self.vault = Vault(self.store, self.data_key)
+        self.catalog = load_builtin()
         self.audit = AuditLog(":memory:" if demo else data / "audit.db")
         voters = config.cluster.voters or [config.node.id]
         self.raft = RaftNode(
@@ -113,12 +123,17 @@ class Runtime:
         actions.register(self.registry, self.store, self.backend)
         if isinstance(self.backend, actions.LiveBackend):
             self.backend.node_update = self._node_update
+            self.backend.write = self.write
+            self.backend.vault = self.vault
         self._policy_raw: str | None = None
         self.governor = Governor(Policy())
         self.reconciler = Reconciler(self.governor, self.engine)
         self.incidents: list[Incident] = []
         self.probes: dict[str, list[ProbeResult]] = {}
-        self.provider: Provider | None = None
+        self._ai_raw: str | None = None
+        self._ai = AISettings()
+        self._providers: dict[str, Provider] = {}
+        self._selection_running = False
         self._subscribers: set[asyncio.Queue[dict[str, Any]]] = set()
         self._tasks: list[asyncio.Task[Any]] = []
         self.started_at = datetime.now(UTC)
@@ -126,20 +141,150 @@ class Runtime:
             lambda job: self.publish({"type": "job", "id": job.id, "state": job.state})
         )
         self.audit.subscribe(lambda e: self.publish({"type": "event", "entry": e}))
-        try:
-            settings = config.zorec.model_dump()
-            settings["api_key"] = read_secret(config.zorec.api_key_file)
-            self.provider = from_settings(settings)
-        except (ProviderError, OSError, KeyError) as exc:
-            log.warning("zorec provider unavailable: %s", exc)
+        self._config_provider: tuple[ProviderConfig, str | None] | None = None
+        if config.zorec.provider != "none":
+            try:
+                self._config_provider = self._from_config(config)
+            except (OSError, ValueError) as exc:
+                log.warning("zorec provider from the configuration is unusable: %s", exc)
+
+    @staticmethod
+    def _from_config(config: Config) -> tuple[ProviderConfig, str | None]:
+        z = config.zorec
+        kind = {"local": Kind.OLLAMA}.get(z.provider, Kind(z.provider))
+        cfg = ProviderConfig(
+            id="config",
+            label=z.label or z.provider,
+            kind=kind,
+            url=z.url,
+            model=z.model,
+            local=z.local if z.local is not None else kind in (Kind.OLLAMA,),
+            context_tokens=z.context_tokens,
+            ca_pem=Path(z.ca_file).read_text() if z.ca_file else None,
+        )
+        return cfg, read_secret(z.api_key_file)
 
     # -- state -----------------------------------------------------------
+
+    def adapters(self) -> dict[str, Adapter]:
+        """Curated adapters plus those drafted or approved in this cluster."""
+        out = dict(self.catalog)
+        for doc in self.store.list("adapter"):
+            out[doc["id"]] = Adapter.model_validate(doc)
+        return out
 
     def fleet(self) -> Fleet:
         return Fleet(self.store)
 
+    # -- zorec ------------------------------------------------------------
+
+    @property
+    def ai(self) -> AISettings:
+        """Replicated AI settings; a provider from the config file is offered when unset."""
+        raw = self.store.meta("zorec")
+        if raw != self._ai_raw:
+            self._ai_raw = raw
+            self._providers = {}
+            if raw:
+                self._ai = AISettings.model_validate_json(raw)
+            elif self._config_provider:
+                cfg = self._config_provider[0]
+                self._ai = AISettings(enabled=True, providers=[cfg], active=cfg.id)
+            else:
+                self._ai = AISettings()
+        return self._ai
+
+    async def save_ai(self, settings: AISettings) -> None:
+        await self.write({"op": "meta", "key": "zorec", "value": settings.model_dump_json()})
+
+    def provider_for(self, cfg: ProviderConfig) -> Provider:
+        cached = self._providers.get(cfg.id)
+        if cached is not None and cached.config == cfg:
+            return cached
+        key: str | None = None
+        if cfg.secret_id:
+            try:
+                key = self.vault.reveal(cfg.secret_id)
+            except KeyError as exc:
+                raise ProviderError("the API key is missing") from exc
+        elif self._config_provider and cfg.id == self._config_provider[0].id:
+            key = self._config_provider[1]
+        provider = build_provider(cfg, key)
+        self._providers[cfg.id] = provider
+        return provider
+
+    def _usable(self, provider_id: str | None) -> Provider | None:
+        cfg = self.ai.usable(provider_id)
+        if cfg is None:
+            return None
+        try:
+            return self.provider_for(cfg)
+        except ProviderError as exc:
+            log.warning("zorec provider %s unavailable: %s", cfg.id, exc)
+            return None
+
+    @property
+    def provider(self) -> Provider | None:
+        return self._usable(self.ai.active)
+
     def zorec(self) -> Zorec:
-        return Zorec(self.fleet(), self.engine, self.provider, self.registry.names() + UI_ACTIONS)
+        ai = self.ai
+        caps = {c.value for c in Capability if ai.allowed(c)}
+        if not ai.enabled:
+            caps = {Capability.GUIDE.value, Capability.PROPOSE.value}
+        return Zorec(
+            self.fleet(),
+            self.engine,
+            self.provider,
+            self.registry.names() + UI_ACTIONS,
+            capabilities=caps,
+            fallback=self._usable(ai.fallback) if ai.fallback != ai.active else None,
+        )
+
+    async def run_selection(self, user: str = "opstend") -> dict[str, Any]:
+        """Test the listed models and switch when a better one passes (see zorec.selection)."""
+        if self._selection_running:
+            raise RuntimeError("a model search is already running")
+        self._selection_running = True
+        try:
+            ai = self.ai
+            providers: dict[str, Provider] = {}
+            for cfg in ai.providers:
+                with contextlib.suppress(ProviderError):
+                    providers[cfg.id] = self.provider_for(cfg)
+            decision = await selection.search(ai, providers)
+            history = json.loads(self.store.meta("zorec.selection") or "[]")[-9:]
+            await self.write(
+                {
+                    "op": "meta",
+                    "key": "zorec.selection",
+                    "value": json.dumps([*history, decision]),
+                }
+            )
+            if decision["action"] == "switch" and ai.selection.auto_switch:
+                await self.save_ai(selection.apply(self.ai, decision))
+                decision["applied"] = True
+            self.audit.record(
+                user,
+                "zorec.model_search",
+                "zorec",
+                detail={"action": decision["action"], "best": decision["best"]},
+            )
+            return decision
+        finally:
+            self._selection_running = False
+
+    async def _model_search(self) -> None:
+        ai = self.ai
+        if not (ai.enabled and ai.selection.enabled) or not self.policy.window.is_open():
+            return
+        history = json.loads(self.store.meta("zorec.selection") or "[]")
+        if history:
+            last = datetime.fromisoformat(history[-1]["ran_at"])
+            if datetime.now(UTC) - last < timedelta(days=ai.selection.interval_days):
+                return
+        with contextlib.suppress(RuntimeError):
+            await self.run_selection()
 
     @property
     def policy(self) -> Policy:
@@ -210,6 +355,7 @@ class Runtime:
         if not self.demo:
             self._tasks.append(asyncio.create_task(self._loop(self._collect, 60.0)))
             self._tasks.append(asyncio.create_task(self._loop(self._scan, 6 * 3600.0)))
+            self._tasks.append(asyncio.create_task(self._loop(self._model_search, 1800.0)))
             if self.config.discovery_subnets:
                 self._tasks.append(asyncio.create_task(self._loop(self._discover, 900.0)))
             with contextlib.suppress(OSError):
@@ -243,6 +389,8 @@ class Runtime:
             if token_file.exists():
                 data = await self.identity.join(token_file.read_text().strip(), cfg.node.id, info)
                 self.raft.voters = list(data["voters"])
+                self.data_key = DataKey(self.identity.path("data.key").read_bytes())
+                self.vault.key = self.data_key
                 self.store.set_meta("peers", json.dumps(data["peers"]))
                 token_file.unlink()
                 log.info("joined cluster; leader set has %s voters", len(data["voters"]))
@@ -359,6 +507,7 @@ class Runtime:
             findings=fleet.findings(),
             updates=fleet.updates(),
             publications={p.service_id: p.id for p in fleet.publications()},
+            workloads=self.store.list("workload"),
             names={
                 **{h.id: h.name for h in fleet.hosts()},
                 **{s.id: s.name for s in fleet.services()},

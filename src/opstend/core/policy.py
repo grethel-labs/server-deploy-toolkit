@@ -33,6 +33,7 @@ class Category(StrEnum):
     DEPLOY = "deploy"  # create or change workloads
     BACKUP = "backup"  # run backups and restore tests
     POWER = "power"  # start/stop/reboot guests and hosts
+    SANDBOX = "sandbox"  # remove expired sandboxes
 
 
 DISRUPTIVE = {Category.PATCH, Category.UPGRADE, Category.POWER, Category.NETWORK}
@@ -56,6 +57,7 @@ class Policy(Model):
             Category.DEPLOY: Autonomy.PROPOSE,
             Category.BACKUP: Autonomy.AUTO,
             Category.POWER: Autonomy.PROPOSE,
+            Category.SANDBOX: Autonomy.AUTO,
         }
     )
     budget: Budget = Field(default_factory=Budget)
@@ -134,3 +136,21 @@ class Governor:
 
     def spend(self, category: Category, target: str, now: datetime | None = None) -> None:
         self._history[f"{category}:{target}"].append(now or datetime.now(UTC))
+
+
+PRESETS: dict[str, dict[str, Autonomy]] = {
+    # Prepare everything, change nothing without a person.
+    "careful": {c.value: Autonomy.PROPOSE for c in Category}
+    | {Category.SANDBOX.value: Autonomy.AUTO},
+    # The default: self-healing, security patches and backups run on their own.
+    "balanced": dict(Policy().autonomy),
+    # Full automation: everything runs within budgets, windows and the kill switch.
+    "full": {c.value: Autonomy.AUTO for c in Category},
+}
+
+
+def preset(name: str, current: Policy) -> Policy:
+    """`current` with the autonomy of a preset; budgets, window and kill switch stay."""
+    updated = current.model_copy(deep=True)
+    updated.autonomy = dict(PRESETS[name])
+    return updated

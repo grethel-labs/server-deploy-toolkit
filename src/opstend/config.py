@@ -77,10 +77,16 @@ class Integrations(Strict):
 
 
 class ZorecConfig(Strict):
-    provider: str = "none"  # none | anthropic | local
+    """A first model for Zorec; afterwards it is managed in Settings → AI."""
+
+    provider: str = "none"  # none | openai | ollama | anthropic | local (= ollama)
+    label: str | None = None
     model: str | None = None
     url: str | None = None
     api_key_file: str | None = None
+    ca_file: str | None = None  # trust a private CA (PEM)
+    context_tokens: int = 8192
+    local: bool | None = None  # data stays in your network; default: true for ollama
 
 
 class Config(Strict):

@@ -114,6 +114,19 @@ class Platform(StrEnum):
     UNIFI = "unifi"
 
 
+class HostDevice(Model):
+    """A device a workload can be given: GPU, USB, display output, serial port, audio."""
+
+    id: str
+    kind: str  # gpu | usb | display | serial | audio | pci
+    name: str
+    path: str | None = None
+    vendor: str | None = None  # hex vendor id
+    product: str | None = None  # hex product id
+    driver: str | None = None
+    in_use_by: str | None = None
+
+
 class Host(Model):
     """A managed system: a Proxmox node, a Linux server or a UniFi console."""
 
@@ -131,6 +144,7 @@ class Host(Model):
     managed_by: str | None = None
     observed: Observed | None = None
     tags: list[str] = Field(default_factory=list)
+    devices: list[HostDevice] = Field(default_factory=list)
 
 
 class GuestKind(StrEnum):

@@ -11,7 +11,7 @@ import { Login } from "./pages/Login";
 import { Network } from "./pages/Network";
 import { Operations } from "./pages/Operations";
 import { Security } from "./pages/Security";
-import { NewService, Services } from "./pages/Services";
+import { Apps, FromRepository, InstallWizard, WorkloadDetail } from "./pages/Apps";
 import { Settings } from "./pages/Settings";
 import { Updates } from "./pages/Updates";
 
@@ -61,7 +61,7 @@ function Shell() {
   const nav: { group?: string; path: string; icon: string; label: string; badge?: number }[] = [
     { path: "/", icon: "ops", label: t("Operations"), badge: decisions },
     { group: t("Infrastructure"), path: "/infra", icon: "server", label: t("Hosts and guests") },
-    { path: "/services", icon: "box", label: t("Services") },
+    { path: "/apps", icon: "box", label: t("Applications") },
     { path: "/network", icon: "network", label: t("Network") },
     { group: t("Care"), path: "/security", icon: "shield", label: t("Security") },
     { path: "/updates", icon: "refresh", label: "Updates" },
@@ -84,8 +84,10 @@ function Shell() {
     if (p.startsWith("/guests/")) return <GuestDetail id={decodeURIComponent(p.slice(8))} />;
     if (p.startsWith("/devices/")) return <DeviceDetail id={decodeURIComponent(p.slice(9))} />;
     if (p.startsWith("/object/")) return <ObjectRedirect id={decodeURIComponent(p.slice(8))} />;
-    if (p === "/services/new") return <NewService />;
-    if (p === "/services") return <Services />;
+    if (p === "/apps/new" || p === "/services/new") return <FromRepository />;
+    if (p.startsWith("/apps/install/")) return <InstallWizard adapterId={decodeURIComponent(p.slice(14))} />;
+    if (p === "/apps" || p === "/services") return <Apps />;
+    if (p.startsWith("/apps/")) return <WorkloadDetail id={decodeURIComponent(p.slice(6))} />;
     if (p.startsWith("/network")) return <Network />;
     if (p === "/security") return <Security />;
     if (p === "/updates") return <Updates />;
