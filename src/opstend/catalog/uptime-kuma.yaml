@@ -1,0 +1,23 @@
+id: uptime-kuma
+name: Uptime Kuma
+version: "1.0.0"
+description: Monitors websites and services and notifies you when they fail.
+category: monitoring
+homepage: https://github.com/louislam/uptime-kuma
+services:
+  - name: app
+    image: docker.io/louislam/uptime-kuma:1
+    ports: [{container: 3001, exposure: lan}]
+    volumes: [{name: data, path: /app/data, backup: true}]
+    health: {kind: http, path: /, port: 3001}
+    memory_mb: 384
+    read_only: false
+resources: {cpus: 1, memory_mb: 384, storage_gb: 2}
+network:
+  egress: internet
+tests:
+  - {name: Web interface answers, service: app, port: 3001, path: /, expect_status: [200, 302]}
+backup_paths: [/app/data]
+architectures: [amd64, arm64, armv7]
+notes:
+  - Needs internet access to check external websites.

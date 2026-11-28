@@ -25,6 +25,7 @@ from opstend.core.models import (
     GuestState,
     Health,
     Host,
+    HostDevice,
     Lldp,
     Network,
     Nic,
@@ -281,7 +282,26 @@ HOSTS = [
         capacity=Resources(cpu_cores=8, memory_mb=32768, disk_gb=950),
         usage=Usage(cpu_pct=71.0, memory_mb=18900, disk_gb=402),
         observed=_obs("linux-agent"),
-        tags=["arch=amd64", "pkg=apt", "init=systemd"],
+        tags=["arch=amd64", "pkg=apt", "init=systemd", "podman"],
+        devices=[
+            HostDevice(
+                id="/dev/dri/renderD128",
+                kind="gpu",
+                name="Intel UHD Graphics 770",
+                path="/dev/dri/renderD128",
+            ),
+            HostDevice(
+                id="/dev/dri/card0", kind="display", name="HDMI output", path="/dev/dri/card0"
+            ),
+            HostDevice(
+                id="usb:10c4:ea60:/dev/bus/usb/001/004",
+                kind="usb",
+                name="Silicon Labs Zigbee Stick (CP210x)",
+                path="/dev/bus/usb/001/004",
+                vendor="10c4",
+                product="ea60",
+            ),
+        ],
     ),
     Host(
         id="linux:nuc-c",
@@ -295,7 +315,7 @@ HOSTS = [
         capacity=Resources(cpu_cores=4, memory_mb=16384, disk_gb=480),
         usage=Usage(cpu_pct=12.0, memory_mb=6100, disk_gb=120),
         observed=_obs("linux-agent"),
-        tags=["arch=amd64", "pkg=apt", "init=systemd"],
+        tags=["arch=amd64", "pkg=apt", "init=systemd", "podman"],
     ),
     Host(
         id="linux:pi-sensor",
@@ -309,7 +329,17 @@ HOSTS = [
         capacity=Resources(cpu_cores=4, memory_mb=8192, disk_gb=120),
         usage=Usage(cpu_pct=9.0, memory_mb=1400, disk_gb=18),
         observed=_obs("linux-agent"),
-        tags=["arch=arm64", "pkg=apk", "init=openrc"],
+        tags=["arch=arm64", "pkg=apk", "init=openrc", "podman"],
+        devices=[
+            HostDevice(
+                id="/dev/ttyUSB0",
+                kind="serial",
+                name="FTDI USB serial (Messbus)",
+                path="/dev/ttyUSB0",
+                vendor="0403",
+                product="6001",
+            )
+        ],
     ),
     Host(
         id="linux:edge-01",
@@ -323,7 +353,7 @@ HOSTS = [
         capacity=Resources(cpu_cores=2, memory_mb=4096, disk_gb=80),
         usage=Usage(cpu_pct=4.0, memory_mb=900, disk_gb=11),
         observed=_obs("linux-agent", 400),
-        tags=["arch=arm64", "pkg=apt", "init=systemd"],
+        tags=["arch=arm64", "pkg=apt", "init=systemd", "podman"],
     ),
 ]
 
@@ -920,5 +950,37 @@ def load(store: Store) -> None:
     put_all("node", NODES)
     put_all("update", UPDATES)
     put_all("finding", FINDINGS)
+    from opstend.workloads.catalog import load_builtin
+    from opstend.workloads.models import WorkloadState, sandbox_from
+
+    catalog = load_builtin()
+    kuma = catalog["uptime-kuma"].instantiate("kuma", "Uptime Kuma", {}, {})
+    kuma.host_id, kuma.state, kuma.created_by = "linux:nuc-c", WorkloadState.RUNNING, "anna"
+    mqtt = catalog["mosquitto"].instantiate("mqtt-broker", "MQTT Broker", {}, {})
+    mqtt.host_id, mqtt.state = "linux:pi-sensor", WorkloadState.RUNNING
+    vault = catalog["vaultwarden"].instantiate(
+        "tresor", "Tresor", {"signups": False}, {"admin_token": "demo-tresor-admin"}
+    )
+    sandbox = sandbox_from(vault, hours=3)
+    sandbox.id, sandbox.host_id, sandbox.state = "tresor-sbx", "linux:host-b", WorkloadState.TESTING
+    for wl in (kuma, mqtt, sandbox):
+        wl.tests = [{**t, "ok": True, "detail": "200"} for t in wl.tests]
+        store.put("workload", wl.id, wl.model_dump(mode="json"))
+        for svc in wl.services:
+            gid = f"{wl.host_id}:podman:{wl.id}-{svc.name}"
+            store.put(
+                "guest",
+                gid,
+                Guest(
+                    id=gid,
+                    host_id=wl.host_id or "",
+                    kind=GuestKind.CONTAINER,
+                    native_id=f"{wl.id}-{svc.name}",
+                    name=f"{wl.id}-{svc.name}",
+                    state=GuestState.RUNNING,
+                    image=svc.image,
+                    tags=[f"opstend.workload={wl.id}"],
+                ).model_dump(mode="json"),
+            )
     store.set_meta("site.name", "Werkstatt")
     store.set_meta("demo", "true")

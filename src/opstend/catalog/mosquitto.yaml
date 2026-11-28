@@ -1,0 +1,30 @@
+id: mosquitto
+name: Mosquitto MQTT
+version: "1.0.0"
+description: MQTT broker for sensors and home automation.
+category: iot
+homepage: https://mosquitto.org
+services:
+  - name: broker
+    image: docker.io/library/eclipse-mosquitto:2
+    ports: [{container: 1883, exposure: lan}]
+    volumes: [{name: data, path: /mosquitto/data, backup: true}]
+    health: {kind: tcp, port: 1883}
+    memory_mb: 64
+    read_only: true
+settings:
+  - {name: allow_anonymous, label: Allow clients without a password, type: boolean, default: false}
+files:
+  - service: broker
+    path: /mosquitto/config/mosquitto.conf
+    content: |
+      listener 1883
+      allow_anonymous {allow_anonymous}
+      persistence true
+      persistence_location /mosquitto/data/
+resources: {cpus: 0.25, memory_mb: 64, storage_gb: 1}
+network: {egress: none}
+tests:
+  - {name: Broker accepts connections, service: broker, port: 1883, path: tcp}
+backup_paths: [/mosquitto/data]
+architectures: [amd64, arm64, armv7, ppc64le, s390x, "386"]

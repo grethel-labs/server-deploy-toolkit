@@ -1,0 +1,24 @@
+id: gitea
+name: Gitea
+version: "1.0.0"
+description: Git hosting with issues, pull requests and packages.
+category: development
+homepage: https://gitea.com
+services:
+  - name: server
+    image: docker.io/gitea/gitea:1.24
+    ports:
+      - {container: 3000, exposure: lan}
+      - {container: 22, exposure: lan}
+    volumes: [{name: data, path: /data, backup: true}]
+    health: {kind: http, path: /api/healthz, port: 3000}
+    memory_mb: 512
+    read_only: false
+settings:
+  - {name: app_name, label: Site name, type: string, default: Gitea, env: GITEA__server__APP_NAME}
+resources: {cpus: 1, memory_mb: 512, storage_gb: 10}
+network: {egress: none}
+tests:
+  - {name: Health endpoint answers, service: server, port: 3000, path: /api/healthz, expect_status: [200]}
+backup_paths: [/data]
+architectures: [amd64, arm64, armv7]

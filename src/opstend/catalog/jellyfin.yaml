@@ -1,0 +1,27 @@
+id: jellyfin
+name: Jellyfin
+version: "1.0.0"
+description: Media server for films, series, music and photos.
+category: media
+homepage: https://jellyfin.org
+services:
+  - name: server
+    image: docker.io/jellyfin/jellyfin:10.10.7
+    ports: [{container: 8096, exposure: lan}]
+    volumes:
+      - {name: config, path: /config, backup: true}
+      - {name: cache, path: /cache, backup: false}
+      - {name: media, path: /media, backup: false}
+    health: {kind: http, path: /health, port: 8096}
+    memory_mb: 2048
+    cpus: 2
+    read_only: false
+resources: {cpus: 2, memory_mb: 2048, storage_gb: 20}
+devices:
+  - {kind: gpu, selector: "", optional: true, reason: Hardware video transcoding}
+network:
+  egress: allowlist
+  egress_hosts: [api.themoviedb.org, image.tmdb.org, musicbrainz.org, repo.jellyfin.org]
+tests:
+  - {name: Server is healthy, service: server, port: 8096, path: /health, expect_status: [200], expect_text: Healthy}
+backup_paths: [/config]

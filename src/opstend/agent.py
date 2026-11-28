@@ -10,6 +10,7 @@ without a shell and returns the result. Every request is logged.
 from __future__ import annotations
 
 import asyncio
+import base64
 import json
 import logging
 import os
@@ -26,7 +27,7 @@ from opstend.adapters.runner import ALLOWED, CommandError, Result, Runner
 log = logging.getLogger("opstend.agent")
 
 SOCKET = Path("/run/opstend/agent.sock")
-MAX_REQUEST = 64 * 1024
+MAX_REQUEST = 1024 * 1024
 
 # Arguments that would turn an allowed program into a general shell or editor.
 DENIED_ARGS = {
@@ -61,6 +62,8 @@ def check(argv: list[str]) -> None:
             raise PermissionError(f"{' '.join(denied)} is not allowed through the agent")
     if prog == "nft" and argv[1:2] != ["list"]:
         raise PermissionError("nft may only list rules through the agent; changes are jobs")
+    if prog == "udevadm" and argv[1:] != ["info", "--export-db"]:
+        raise PermissionError("udevadm may only list devices")
     if prog == "sshd" and argv[1:] != ["-T"]:
         raise PermissionError("sshd may only print its configuration")
     if prog == "cat" and not all(a.startswith(READABLE) for a in argv[1:]):
@@ -98,8 +101,13 @@ class Agent:
                 if k in ("DEBIAN_FRONTEND", "LC_ALL", "LANG")
             }
             runner = self.runner or Runner()
+            stdin = base64.b64decode(req["stdin"]) if req.get("stdin") else None
             result = await runner.run(
-                argv, check=False, timeout=float(req.get("timeout") or 120), env=env
+                argv,
+                check=False,
+                timeout=float(req.get("timeout") or 120),
+                env=env,
+                input_data=stdin,
             )
             log.info("agent ran %s -> %s", argv[:3], result.code)
             out: dict[str, Any] = {
@@ -146,7 +154,12 @@ class AgentRunner(Runner):
         reader, writer = await asyncio.open_unix_connection(str(self.path))
         writer.write(
             json.dumps(
-                {"argv": argv, "env": env or {}, "timeout": timeout or self.timeout}
+                {
+                    "argv": argv,
+                    "env": env or {},
+                    "timeout": timeout or self.timeout,
+                    "stdin": base64.b64encode(input_data).decode() if input_data else None,
+                }
             ).encode()
             + b"\n"
         )

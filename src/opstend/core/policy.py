@@ -33,6 +33,7 @@ class Category(StrEnum):
     DEPLOY = "deploy"  # create or change workloads
     BACKUP = "backup"  # run backups and restore tests
     POWER = "power"  # start/stop/reboot guests and hosts
+    SANDBOX = "sandbox"  # remove expired sandboxes
 
 
 DISRUPTIVE = {Category.PATCH, Category.UPGRADE, Category.POWER, Category.NETWORK}
@@ -56,6 +57,7 @@ class Policy(Model):
             Category.DEPLOY: Autonomy.PROPOSE,
             Category.BACKUP: Autonomy.AUTO,
             Category.POWER: Autonomy.PROPOSE,
+            Category.SANDBOX: Autonomy.AUTO,
         }
     )
     budget: Budget = Field(default_factory=Budget)

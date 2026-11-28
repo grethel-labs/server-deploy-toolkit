@@ -31,9 +31,11 @@ from opstend.core.models import Node, NodeState, Resources, Usage
 from opstend.core.policy import Governor, Policy
 from opstend.core.store import Store
 from opstend.integrations import Integrations
+from opstend.secrets import DataKey, Vault
 from opstend.selfmanage.health import ProbeResult
 from opstend.selfmanage.reconciler import Incident, Observations, Reconciler
 from opstend.state import Fleet
+from opstend.workloads.catalog import Adapter, load_builtin
 from opstend.zorec.assistant import Zorec
 from opstend.zorec.providers import Provider, ProviderError, from_settings
 
@@ -76,6 +78,11 @@ class Runtime:
             data.mkdir(parents=True, exist_ok=True)
         self.store = Store(":memory:" if demo else data / "state.db")
         self.identity: Identity | None = None if demo else Identity(data)
+        self.data_key = (
+            DataKey.generate() if demo else DataKey.load_or_create(data / "cluster" / "data.key")
+        )
+        self.vault = Vault(self.store, self.data_key)
+        self.catalog = load_builtin()
         self.audit = AuditLog(":memory:" if demo else data / "audit.db")
         voters = config.cluster.voters or [config.node.id]
         self.raft = RaftNode(
@@ -113,6 +120,8 @@ class Runtime:
         actions.register(self.registry, self.store, self.backend)
         if isinstance(self.backend, actions.LiveBackend):
             self.backend.node_update = self._node_update
+            self.backend.write = self.write
+            self.backend.vault = self.vault
         self._policy_raw: str | None = None
         self.governor = Governor(Policy())
         self.reconciler = Reconciler(self.governor, self.engine)
@@ -134,6 +143,13 @@ class Runtime:
             log.warning("zorec provider unavailable: %s", exc)
 
     # -- state -----------------------------------------------------------
+
+    def adapters(self) -> dict[str, Adapter]:
+        """Curated adapters plus those drafted or approved in this cluster."""
+        out = dict(self.catalog)
+        for doc in self.store.list("adapter"):
+            out[doc["id"]] = Adapter.model_validate(doc)
+        return out
 
     def fleet(self) -> Fleet:
         return Fleet(self.store)
@@ -243,6 +259,8 @@ class Runtime:
             if token_file.exists():
                 data = await self.identity.join(token_file.read_text().strip(), cfg.node.id, info)
                 self.raft.voters = list(data["voters"])
+                self.data_key = DataKey(self.identity.path("data.key").read_bytes())
+                self.vault.key = self.data_key
                 self.store.set_meta("peers", json.dumps(data["peers"]))
                 token_file.unlink()
                 log.info("joined cluster; leader set has %s voters", len(data["voters"]))
@@ -359,6 +377,7 @@ class Runtime:
             findings=fleet.findings(),
             updates=fleet.updates(),
             publications={p.service_id: p.id for p in fleet.publications()},
+            workloads=self.store.list("workload"),
             names={
                 **{h.id: h.name for h in fleet.hosts()},
                 **{s.id: s.name for s in fleet.services()},

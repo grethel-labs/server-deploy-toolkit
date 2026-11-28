@@ -314,7 +314,7 @@ class Zorec:
             return Answer(
                 text,
                 "rules",
-                [Link(tr("New service"), "#/services/new")],
+                [Link(tr("New application"), "#/apps/new")],
                 actions,
             )
         return None

@@ -1,0 +1,34 @@
+id: paperless
+name: Paperless-ngx
+version: "1.0.0"
+description: Scans, recognizes and archives documents.
+category: office
+homepage: https://docs.paperless-ngx.com
+services:
+  - name: broker
+    image: docker.io/library/redis:7-alpine
+    volumes: [{name: redis, path: /data, backup: false}]
+    health: {kind: tcp, port: 6379}
+    memory_mb: 128
+    read_only: false
+  - name: web
+    image: ghcr.io/paperless-ngx/paperless-ngx:2.18
+    depends_on: [broker]
+    ports: [{container: 8000, exposure: lan}]
+    volumes:
+      - {name: data, path: /usr/src/paperless/data, backup: true}
+      - {name: media, path: /usr/src/paperless/media, backup: true}
+    env:
+      - {name: PAPERLESS_REDIS, value: "redis://broker:6379"}
+    health: {kind: http, path: /, port: 8000}
+    memory_mb: 1536
+    cpus: 2
+    read_only: false
+settings:
+  - {name: secret_key, label: Secret key, type: secret, env: PAPERLESS_SECRET_KEY, service: web, required: true}
+  - {name: ocr_language, label: OCR language, type: select, options: [deu, eng, deu+eng], default: deu+eng, env: PAPERLESS_OCR_LANGUAGE, service: web}
+resources: {cpus: 2, memory_mb: 1664, storage_gb: 20}
+network: {egress: none}
+tests:
+  - {name: Web interface answers, service: web, port: 8000, path: /, expect_status: [200, 302]}
+backup_paths: [/usr/src/paperless/data, /usr/src/paperless/media]

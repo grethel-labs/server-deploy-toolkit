@@ -60,13 +60,26 @@ test("Zorec answers from live state without a language model", async ({ page }) 
   await expect(page.locator(".msg").last()).toContainText("Updates verfügbar");
 });
 
-test("a service is proposed from a repository and validated", async ({ page }) => {
-  await page.goto("/#/services/new");
+test("an application is drafted from a repository", async ({ page }) => {
+  await page.goto("/#/apps/new");
   await page.getByRole("button", { name: "Beispiel laden" }).click();
-  await expect(page.getByRole("heading", { name: "web" })).toBeVisible();
-  await expect(page.getByText("Gib das Geheimnis API_TOKEN für web an")).toBeVisible();
-  await page.getByRole("button", { name: "Vorschau erstellen" }).click();
-  await expect(page.getByRole("dialog")).toContainText("bereitstellen");
+  await expect(page.getByText("Entwurf: Wetterstation")).toBeVisible();
+  await expect(page.getByText(/Gib das Geheimnis API_TOKEN/)).toBeVisible();
+  await expect(page.getByRole("link", { name: "In einer Sandbox testen" })).toBeVisible();
+});
+
+test("an application is installed into a sandbox with isolation preview", async ({ page }) => {
+  await page.goto("/#/apps?tab=catalog");
+  await page.locator(".app-card", { hasText: "Whoami" }).getByRole("link", { name: "Installieren" }).click();
+  await expect(page.getByRole("heading", { name: "Whoami test service installieren" })).toBeVisible();
+  for (let i = 0; i < 4; i++) await page.getByRole("button", { name: "Weiter" }).click();
+  await expect(page.getByText("Kein Internetzugang.")).toBeVisible();
+  await expect(page.locator(".diagram-canvas svg")).toBeVisible({ timeout: 15_000 });
+  await page.getByRole("button", { name: "Sandbox starten" }).click();
+  await page.getByRole("button", { name: "Freigeben und ausführen" }).click();
+  await expect(page.locator(".pill", { hasText: "Erledigt" }).first()).toBeVisible({ timeout: 20_000 });
+  await page.goto("/#/apps?tab=sandboxes");
+  await expect(page.getByRole("cell", { name: /Whoami test service \(Sandbox\)/ })).toBeVisible();
 });
 
 test("theme toggles to dark and the app stays readable", async ({ page }) => {

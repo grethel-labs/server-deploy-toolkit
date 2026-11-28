@@ -20,6 +20,7 @@ from __future__ import annotations
 from collections import defaultdict
 from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
+from typing import Any
 
 from opstend.core.jobs import Engine, Job, Step
 from opstend.core.models import Finding, Node, NodeState, Service, Severity, Update
@@ -62,6 +63,7 @@ class Observations:
     backup_targets: dict[str, timedelta] = field(default_factory=dict)
     publications: dict[str, str] = field(default_factory=dict)  # service id -> publication id
     names: dict[str, str] = field(default_factory=dict)  # object id -> display name
+    workloads: list[dict[str, Any]] = field(default_factory=list)
 
     def name(self, oid: str) -> str:
         return self.names.get(oid, oid.split(":")[-1].split("/")[-1])
@@ -156,6 +158,32 @@ class Reconciler:
                     key=f"patch:{target}",
                 )
             )
+        for wl in obs.workloads:
+            expires = wl.get("expires_at")
+            if (
+                wl.get("environment") == "sandbox"
+                and expires
+                and wl.get("state") not in ("removed", "expired")
+                and datetime.fromisoformat(expires) <= now
+            ):
+                out.append(
+                    Proposal(
+                        Category.SANDBOX,
+                        f"workload/{wl['id']}",
+                        tr("Remove expired sandbox {name}", name=wl["name"]),
+                        tr(
+                            "The sandbox was meant to run until {time}",
+                            time=expires[:16].replace("T", " "),
+                        ),
+                        [
+                            Step(
+                                action="workload.remove",
+                                params={"workload": wl["id"], "purge": True},
+                            )
+                        ],
+                        key=f"sandbox:{wl['id']}",
+                    )
+                )
         for target, max_age in obs.backup_targets.items():
             last = obs.last_backup.get(target)
             if last is None or now - last > max_age:

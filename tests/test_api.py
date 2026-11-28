@@ -100,3 +100,57 @@ def test_policy_requires_admin_and_roundtrips(client):
     p = client.get("/api/policy").json()
     p["kill_switch"] = True
     assert client.put("/api/policy", json=p).json()["kill_switch"] is True
+
+
+def _wait_job(client, job_id, want="succeeded"):
+    for _ in range(100):
+        state = client.get(f"/api/jobs/{job_id}").json()["job"]["state"]
+        if state in ("succeeded", "failed", "rolled_back"):
+            break
+        asyncio.run(asyncio.sleep(0.02))
+    assert state == want
+    return state
+
+
+def test_workload_sandbox_install_and_promotion(client):
+    catalog = client.get("/api/catalog").json()
+    assert {a["id"] for a in catalog} >= {"vaultwarden", "jellyfin", "whoami"}
+    request = {
+        "adapter": "vaultwarden",
+        "id": "safe",
+        "name": "Safe",
+        "secrets": {"admin_token": "correct horse"},
+        "environment": "sandbox",
+    }
+    preview = client.post("/api/workloads/preview", json=request).json()
+    assert preview["host"] and preview["workload"]["network"]["egress"] == "none"
+    assert any("internet" in line["text"].lower() for line in preview["isolation"])
+    assert "correct horse" not in str(preview)
+    job = client.post("/api/workloads", json=request).json()
+    assert job["state"] == "awaiting_approval" and "correct horse" not in str(job)
+    client.post(f"/api/jobs/{job['id']}/approve", json={"fingerprint": job["fingerprint"]})
+    _wait_job(client, job["id"])
+    wl = client.get("/api/workloads/safe-sbx").json()["workload"]
+    assert wl["state"] == "testing" and all(t["ok"] for t in wl["tests"])
+    secret_id = wl["secrets"]["ADMIN_TOKEN"]
+    assert client.rt.vault.reveal(secret_id) == "correct horse"
+    assert "correct horse" not in str(client.rt.store.get("secret", secret_id))
+    promo = client.post("/api/workloads/safe-sbx/actions", json={"action": "promote"}).json()
+    client.post(f"/api/jobs/{promo['id']}/approve", json={"fingerprint": promo["fingerprint"]})
+    _wait_job(client, promo["id"])
+    states = {w["id"]: w["state"] for w in client.get("/api/workloads").json()}
+    assert states.get("safe") == "running" and "safe-sbx" not in states
+
+
+def test_device_requests_limit_candidates(client):
+    request = {
+        "adapter": "home-assistant",
+        "id": "ha",
+        "name": "Home Assistant",
+        "devices": [{"kind": "usb", "selector": "10c4:ea60"}],
+        "environment": "production",
+    }
+    preview = client.post("/api/workloads/preview", json=request).json()
+    assert preview["host"] == "linux:host-b"
+    rejected = [c for c in preview["candidates"] if not c["fits"]]
+    assert any("usb" in " ".join(c["reasons"]) for c in rejected)

@@ -62,7 +62,7 @@ export function Zorec({ status }: { status: { busy: boolean; label: string } }) 
 
   function act(a: Answer["actions"][number]) {
     if (a.action === "rollout.plan") return go("/updates");
-    if (a.action === "deploy.analyze") return go(`/services/new?repo=${encodeURIComponent(String(a.params.repo ?? ""))}`);
+    if (a.action === "deploy.analyze") return go(`/apps/new?repo=${encodeURIComponent(String(a.params.repo ?? ""))}`);
     const target = String(a.params.guest ?? a.params.device ?? a.params.host ?? a.params.service ?? "fleet");
     flow.start(() => api.post<Job>("/api/jobs", { title: a.title, target, reason: "Zorec", steps: [{ action: a.action, params: a.params }] }));
   }

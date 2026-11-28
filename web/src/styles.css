@@ -246,3 +246,26 @@ dialog.dlg footer { padding: 12px 20px; border-top: 1px solid var(--line); displ
 .item > * { min-width: 0; }
 .item .btn, .chips .btn { white-space: normal; text-align: left; }
 .title, .msg { overflow-wrap: anywhere; }
+
+/* --- diagrams, apps, wizard --------------------------------------------------------- */
+.diagram-canvas { width: 100%; position: relative; }
+.diagram-canvas svg { position: absolute; inset: 0; width: 100%; height: 100%; }
+.app-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 16px; }
+.app-card { display: grid; gap: 8px; padding: 16px 18px; align-content: start; }
+.app-card .head { display: flex; align-items: center; gap: 10px; }
+.app-card .glyph { width: 40px; height: 40px; border-radius: 10px; display: grid; place-items: center; background: var(--accent-soft); color: var(--accent); font-weight: 800; }
+.app-card p { margin: 0; color: var(--muted); font-size: 0.9rem; }
+.steps-bar { display: flex; gap: 6px; flex-wrap: wrap; }
+.steps-bar span { padding: 4px 10px; border-radius: 99px; font-size: 0.8rem; font-weight: 600; background: var(--idle-soft); color: var(--muted); }
+.steps-bar span[aria-current="step"] { background: var(--accent); color: var(--accent-fg); }
+.steps-bar span.done { background: var(--accent-soft); color: var(--accent); }
+.choice { display: grid; grid-template-columns: auto 1fr; gap: 10px; align-items: start; padding: 12px 14px; border: 1px solid var(--line-strong); border-radius: 10px; cursor: pointer; background: var(--surface); }
+.choice:has(input:checked) { border-color: var(--accent); background: var(--accent-soft); }
+.choice input { margin-top: 3px; accent-color: var(--accent); }
+.choice b { display: block; }
+.checklist { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.checklist li { display: grid; grid-template-columns: 20px 1fr; gap: 8px; align-items: start; }
+.checklist .yes { color: var(--ok); }
+.checklist .attn { color: var(--warn); }
+.env-badge { display: inline-flex; align-items: center; gap: 6px; padding: 2px 10px; border-radius: 99px; font-size: 0.78rem; font-weight: 700; background: color-mix(in srgb, #7c3aed 14%, var(--surface)); color: #7c3aed; }
+:root[data-theme="dark"] .env-badge { color: #c4b5fd; }
